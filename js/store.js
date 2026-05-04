@@ -12,7 +12,7 @@ async function sync(col, id, data) {
 
 export const Store = {
   // Profile
-  getProfile: () => get('profile', { name:'위효연', asset:550000000, targetAsset:5000000000000000, saju:'병인년 계사월 갑인일 기사시' }),
+  getProfile: () => get('profile', { name:'나', asset:0, targetAsset:5000000000000000, saju:'' }),
   setProfile: (p) => { set('profile', p); sync('meta','profile',p); },
 
   // Gate (morning check-in)

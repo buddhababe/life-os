@@ -1,7 +1,7 @@
 {
   "name": "Life OS — The One",
   "short_name": "Life OS",
-  "description": "위효연의 자가진화형 인생 개선 시스템",
+  "description": "자가진화형 인생 개선 시스템",
   "start_url": "/life-os/",
   "display": "standalone",
   "background_color": "#0a0a1a",

@@ -167,7 +167,7 @@ function renderGate() {
 
   <div class="identity-bar" style="margin-bottom:16px">
     <div class="ib-vote">정체성 선언</div>
-    <div class="ib-text">"나는 위효연.<br>오늘의 행동이 The One을 만든다."</div>
+    <div class="ib-text">"나는 The One이 될 사람이다.<br>오늘의 행동이 The One을 만든다."</div>
   </div>
 
   <div class="card">

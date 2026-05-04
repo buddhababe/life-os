@@ -37,7 +37,7 @@ self.addEventListener('notificationclick', (e) => {
       for (const client of clientList) {
         if (client.url.includes('life-os') && 'focus' in client) return client.focus();
       }
-      return clients.openWindow('https://newwhy2.github.io/life-os/');
+      return clients.openWindow('https://buddhababe.github.io/life-os/');
     })
   );
 });

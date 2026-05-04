@@ -1,6 +1,7 @@
 import { getDayGanjio, getDayRating, getMonthCalendar, getMonthEnergyLevel, getYongshinActivities, DAEWOON } from './saju.js';
 import { Store } from './store.js';
 import { FB } from './firebase-init.js';
+import { engine } from './evolution.js';
 
 const today = new Date();
 let currentPage = 'home';
@@ -35,6 +36,11 @@ async function initApp() {
   updateHeader();
   setupNav();
   if (Store.isLoggedIn()) await Store.syncAll();
+  
+  // ── 자가진화 엔진 자동 실행 ──
+  const evolutionResult = await engine.autoCheck();
+  window._evolutionResult = evolutionResult;
+  
   renderPage('home');
   setInterval(updateHeader, 60000);
 }
@@ -98,6 +104,42 @@ function renderHome() {
   const pct = Math.min(99.9, (profile.asset / profile.targetAsset) * 100);
   const goals = Store.getGoals();
   const activities = getYongshinActivities(rating).slice(0,3);
+  const evo = window._evolutionResult;
+  const daysLeft = engine.getDaysUntilNextEvolution();
+  const latestReport = engine.getLatestReport();
+
+  // Evolution nudges/report HTML
+  let evoHtml = '';
+  if (evo?.nudges?.length) {
+    evoHtml = evo.nudges.map(n => `<div class="tip-box ${n.level==='danger'?'danger':n.level==='warning'?'danger':''}"><div class="tip-title">⚡ AI 넛지</div><div class="tip-text">${n.message}</div></div>`).join('');
+  }
+  if (evo?.insights?.length) {
+    // Full evolution report
+    evoHtml += `<div class="card" style="border-color:var(--gold)">
+      <div class="flex-between"><div class="card-title" style="color:var(--gold)">⚡ 주간 자가진화 완료</div><span class="chip chip-gold">점수 ${evo.score?.total||0}/100</span></div>
+      ${evo.insights.slice(0,3).map(i => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--glass-border)">
+        <div style="font-size:12px;font-weight:700;color:${i.level==='success'?'var(--success)':i.level==='warning'?'var(--gold)':'var(--danger)'}">
+          ${i.level==='success'?'✅':i.level==='warning'?'⚠️':'🔥'} ${i.type.replace('_',' ')}
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:3px">${i.message}</div>
+      </div>`).join('')}
+      <div style="font-size:11px;color:var(--text-faint);margin-top:8px">적용된 변경: ${evo.actions?.length||0}개 · 다음 진화까지 7일</div>
+    </div>`;
+  } else if (latestReport) {
+    evoHtml += `<div class="card card-sm" style="border-color:rgba(79,195,247,0.2)">
+      <div class="flex-between">
+        <div class="card-title">⚡ 자가진화 시스템</div>
+        <span class="chip chip-water">D-${daysLeft}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim)">최근 분석: ${latestReport.date} · 점수 ${latestReport.score?.total||0}/100 · 다음 진화까지 ${daysLeft}일</div>
+    </div>`;
+  } else {
+    evoHtml += `<div class="card card-sm" style="border-color:rgba(79,195,247,0.2)">
+      <div class="card-title">⚡ 자가진화 엔진 대기 중</div>
+      <div style="font-size:12px;color:var(--text-dim)">3일 이상 습관을 기록하면 첫 번째 자가분석이 실행됩니다</div>
+    </div>`;
+  }
 
   return `
   <div class="the-one-display">
@@ -111,6 +153,8 @@ function renderHome() {
     <div class="tip-title">${rating.emoji} 오늘의 일진 — ${rating.rating}</div>
     <div class="tip-text">${rating.tip}</div>
   </div>
+
+  ${evoHtml}
 
   <div class="card card-sm">
     <div class="flex-between">

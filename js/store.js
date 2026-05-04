@@ -93,6 +93,10 @@ export const Store = {
   // Auth state
   isLoggedIn: () => !!FB.getUser(),
   
+  // Evolution state
+  getEvolutionState: () => lsGet('evolution_state', { lastRun: 0, reports: [] }),
+  setEvolutionState: (s) => { lsSet('evolution_state', s); syncToFB('meta', 'evolution', s); },
+  
   // Full cloud sync
   async syncAll() {
     if (!FB.isReady() || !FB.getUser()) return false;

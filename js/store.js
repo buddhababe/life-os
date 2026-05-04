@@ -1,171 +1,119 @@
-// STORAGE — localStorage + Firebase 추상화
+// STORE v2.0 — localStorage + optional Firebase sync
 import { FB } from './firebase-init.js';
 
-const PREFIX = 'lifeos_';
+const P = 'lifeos2_'; // v2 prefix
 
-function lsGet(key, fallback = null) {
-  try { const v = localStorage.getItem(PREFIX + key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-}
-function lsSet(key, val) {
-  try { localStorage.setItem(PREFIX + key, JSON.stringify(val)); } catch {}
+const get = (k, fb=null) => { try { const v=localStorage.getItem(P+k); return v?JSON.parse(v):fb; } catch { return fb; } };
+const set = (k, v) => { try { localStorage.setItem(P+k, JSON.stringify(v)); } catch {} };
+
+async function sync(col, id, data) {
+  if (FB.isReady() && FB.getUser()) await FB.save(col, id, data).catch(()=>{});
 }
 
 export const Store = {
+  // Profile
+  getProfile: () => get('profile', { name:'위효연', asset:550000000, targetAsset:5000000000000000, saju:'병인년 계사월 갑인일 기사시' }),
+  setProfile: (p) => { set('profile', p); sync('meta','profile',p); },
+
+  // Gate (morning check-in)
+  getGate: (dateKey) => get('gate_'+dateKey, { done:false }),
+  setGate: (dateKey, data) => { set('gate_'+dateKey, data); sync('gates', dateKey, data); },
+
   // Habits
-  getHabits: () => lsGet('habits', getDefaultHabits()),
-  setHabits: (h) => { lsSet('habits', h); syncToFB('habits', 'main', h); },
-  
-  // Today's completions
+  getHabits: () => get('habits', defaultHabits()),
+  setHabits: (h) => { set('habits', h); sync('meta','habits',{habits:h}); },
+
+  // Completions
   getTodayKey: () => new Date().toISOString().slice(0,10),
-  getCompletions: (dateKey) => lsGet('completions_' + (dateKey || Store.getTodayKey()), {}),
+  getCompletions: (dateKey) => get('comp_'+(dateKey||new Date().toISOString().slice(0,10)), {}),
   setCompletions: (data, dateKey) => {
-    const key = 'completions_' + (dateKey || Store.getTodayKey());
-    lsSet(key, data);
-    syncToFB('completions', dateKey || Store.getTodayKey(), data);
+    const k = dateKey || new Date().toISOString().slice(0,10);
+    set('comp_'+k, data);
+    sync('completions', k, data);
   },
-  
-  // Mandarat
-  getMandarat: () => lsGet('mandarat', getDefaultMandarat()),
-  setMandarat: (m) => { lsSet('mandarat', m); syncToFB('mandarat', 'main', m); },
-  
+
   // Journal
-  getJournal: (dateKey) => lsGet('journal_' + (dateKey || Store.getTodayKey()), {}),
+  getJournal: (dateKey) => get('journal_'+(dateKey||new Date().toISOString().slice(0,10)), {}),
   setJournal: (data, dateKey) => {
-    const key = 'journal_' + (dateKey || Store.getTodayKey());
-    lsSet(key, data);
-    syncToFB('journal', dateKey || Store.getTodayKey(), data);
+    const k = dateKey || new Date().toISOString().slice(0,10);
+    set('journal_'+k, data);
+    sync('journal', k, data);
   },
   getJournalHistory: () => {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(PREFIX + 'journal_'));
-    return keys.map(k => ({ date: k.replace(PREFIX + 'journal_', ''), ...JSON.parse(localStorage.getItem(k)) }))
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith(P+'journal_'))
+      .map(k => ({ date: k.replace(P+'journal_',''), ...JSON.parse(localStorage.getItem(k)||'{}') }))
       .sort((a,b) => b.date.localeCompare(a.date)).slice(0,30);
   },
-  
+
+  // Mandarat
+  getMandarat: () => get('mandarat', defaultMandarat()),
+  setMandarat: (m) => { set('mandarat', m); sync('meta','mandarat',m); },
+
   // Goals
-  getGoals: () => lsGet('goals', getDefaultGoals()),
-  setGoals: (g) => { lsSet('goals', g); syncToFB('goals', 'main', g); },
-  
-  // Profile
-  getProfile: () => lsGet('profile', getDefaultProfile()),
-  setProfile: (p) => { lsSet('profile', p); syncToFB('profile', 'main', p); },
-  
-  // Stats: streak calculation
-  getStreak: (habitId) => {
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0,10);
-      const c = lsGet('completions_' + key, {});
-      if (c[habitId]) streak++;
-      else if (i > 0) break;
+  getGoals: () => get('goals', defaultGoals()),
+  setGoals: (g) => { set('goals', g); sync('meta','goals',{goals:g}); },
+
+  // Evolution
+  getEvolutionState: () => get('evo_state', { lastRun:0, reports:[] }),
+  setEvolutionState: (s) => { set('evo_state', s); sync('meta','evolution',s); },
+
+  // Stats
+  getStreak(habitId) {
+    let s = 0;
+    const t = new Date();
+    for (let i=0; i<365; i++) {
+      const d = new Date(t); d.setDate(d.getDate()-i);
+      const c = this.getCompletions(d.toISOString().slice(0,10));
+      if (c[habitId]) s++;
+      else if (i>0) break;
     }
-    return streak;
+    return s;
   },
-  
-  // Weekly completion rate
-  getWeeklyRate: (habitId) => {
-    let done = 0;
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0,10);
-      const c = lsGet('completions_' + key, {});
+  getWeeklyRate(habitId) {
+    let done=0;
+    const t=new Date();
+    for (let i=0;i<7;i++) {
+      const d=new Date(t); d.setDate(d.getDate()-i);
+      const c=this.getCompletions(d.toISOString().slice(0,10));
       if (c[habitId]) done++;
     }
-    return Math.round((done / 7) * 100);
+    return Math.round(done/7*100);
   },
-  
-  // Evolution: self-correct habits based on completion rate
-  evolveHabits: () => {
-    const habits = Store.getHabits();
-    const evolved = habits.map(h => {
-      const rate = Store.getWeeklyRate(h.id);
-      let note = h.note || '';
-      if (rate < 40) { note = '⬇ 목표 하향 조정됨 (완료율 ' + rate + '%)'; h.difficulty = Math.max(1, (h.difficulty||3) - 1); }
-      else if (rate > 85) { note = '⬆ 목표 상향 조정됨 (완료율 ' + rate + '%)'; h.difficulty = Math.min(5, (h.difficulty||3) + 1); }
-      return { ...h, note, lastEvolved: new Date().toISOString().slice(0,10) };
-    });
-    Store.setHabits(evolved);
-    return evolved;
-  },
-  
-  // Auth state
+
   isLoggedIn: () => !!FB.getUser(),
-  
-  // Evolution state
-  getEvolutionState: () => lsGet('evolution_state', { lastRun: 0, reports: [] }),
-  setEvolutionState: (s) => { lsSet('evolution_state', s); syncToFB('meta', 'evolution', s); },
-  
-  // Full cloud sync
   async syncAll() {
-    if (!FB.isReady() || !FB.getUser()) return false;
-    const keys = ['habits','mandarat','goals','profile'];
-    for (const k of keys) {
-      const remote = await FB.load(k, 'main');
-      if (remote && remote.updatedAt > (lsGet(k+'_synctime', 0))) {
-        lsSet(k, remote); lsSet(k+'_synctime', remote.updatedAt);
-      }
+    if (!FB.isReady()||!FB.getUser()) return;
+    // Pull from Firestore if newer
+    for (const k of ['habits','goals','mandarat','profile']) {
+      const r = await FB.load('meta', k).catch(()=>null);
+      if (r) set(k, r);
     }
-    return true;
   }
 };
 
-async function syncToFB(collection, docId, data) {
-  if (FB.isReady() && FB.getUser()) {
-    await FB.save(collection, docId, data);
-  }
-}
-
-function getDefaultHabits() {
+function defaultHabits() {
   return [
-    { id:'swim', name:'수영 / 운동', icon:'🏊', target:'1.5시간', unit:'시간', method:'원자습관', difficulty:3,
-      cue:'기상 후 운동복 착용', reward:'운동 후 차가운 물 한잔', yongshin:true, streak:0 },
-    { id:'study', name:'CFA/AICPA 공부', icon:'📚', target:'2시간', unit:'시간', method:'의도적연습', difficulty:3,
-      cue:'커피 한잔 후 책상 앉기', reward:'25분 집중 후 5분 휴식', yongshin:true, streak:0 },
-    { id:'meal', name:'2끼 식사 (절식)', icon:'🍽', target:'2끼', unit:'회', method:'타이니해빗', difficulty:2,
-      cue:'기상 2시간 후 첫 식사', reward:'균형잡힌 식사 체크', yongshin:false, streak:0 },
-    { id:'water', name:'수분 섭취 2L', icon:'💧', target:'2L', unit:'L', method:'타이니해빗', difficulty:2,
-      cue:'매 식사 + 운동 전후', reward:'수분 충족 = 癸水 직접 보충', yongshin:true, streak:0 },
-    { id:'journal', name:'야간 저널 3Q', icon:'📓', target:'3문항', unit:'회', method:'자기성찰', difficulty:2,
-      cue:'취침 30분 전', reward:'완료 후 조용한 명상 5분', yongshin:false, streak:0 },
-    { id:'japanese', name:'일본어 학습', icon:'🇯🇵', target:'30분', unit:'분', method:'습관스택', difficulty:2,
-      cue:'저녁 식사 후', reward:'일본 유튜브 10분 시청', yongshin:false, streak:0 }
+    { id:'swim',    icon:'🏊', name:'수영 · 운동',     target:'1.5시간', tiny:'운동복 입기 (2분)',    method:'TinyHabit', difficulty:3, yongshin:true,  cue:'기상 후 운동복 착용' },
+    { id:'study',   icon:'📚', name:'CFA/AICPA 공부',  target:'2시간',   tiny:'책 펼치기 (2분)',     method:'의도적연습', difficulty:3, yongshin:true,  cue:'커피 후 책상 착석' },
+    { id:'water',   icon:'💧', name:'수분 2L',         target:'2L',      tiny:'물 한 잔 (30초)',    method:'TinyHabit', difficulty:1, yongshin:true,  cue:'매 식사 + 운동 전' }
   ];
 }
 
-function getDefaultMandarat() {
-  // 9x9 = 81 cells. Center cell (index 40) = The One
-  // 8 main goals at positions: 13,22,31,39,41,49,58,67 (cross from center of each 3x3)
+function defaultMandarat() {
   const cells = Array(81).fill('');
-  cells[40] = 'THE ONE\n5경원';
-  // Main 8 goals
-  cells[13] = '컬럼비아\n복학';
-  cells[22] = 'CFA\n취득';
-  cells[31] = 'AICPA\n취득';
-  cells[39] = '5.5억→\n10억';
-  cells[41] = '건강\n75kg';
-  cells[49] = '일본어\nN2';
-  cells[58] = '퀀트\n입문';
-  cells[67] = 'Legal-AI\n창업';
-  return { cells, updatedAt: Date.now() };
+  cells[40]='THE\nONE';
+  cells[13]='컬럼비아\n복학'; cells[22]='CFA\n취득'; cells[31]='AICPA\n취득';
+  cells[39]='5.5억→\n10억'; cells[41]='건강\n75kg'; cells[49]='일본어\nN2';
+  cells[58]='퀀트\n입문'; cells[67]='Legal-AI\n창업';
+  return { cells, updatedAt:Date.now() };
 }
 
-function getDefaultGoals() {
+function defaultGoals() {
   return [
-    { id:'g1', icon:'🎓', name:'방통대 졸업', deadline:'2026.08', pct:85, category:'학습' },
-    { id:'g2', icon:'✈', name:'컬럼비아 복학', deadline:'2027.02', pct:20, category:'커리어' },
-    { id:'g3', icon:'📊', name:'AICPA FAR 합격', deadline:'2027.06', pct:5, category:'자격증' },
-    { id:'g4', icon:'💹', name:'CFA Level 1', deadline:'2027.12', pct:0, category:'자격증' },
-    { id:'g5', icon:'💰', name:'자산 10억', deadline:'2030.12', pct:55, category:'재무' },
-    { id:'g6', icon:'🏊', name:'수영 주 3회 정착', deadline:'2026.08', pct:30, category:'건강' },
-    { id:'g7', icon:'⚖', name:'체중 75kg', deadline:'2026.12', pct:40, category:'건강' }
+    { id:'g1', icon:'🎓', name:'방통대 졸업', deadline:'2026.08', pct:85 },
+    { id:'g2', icon:'✈',  name:'컬럼비아 복학', deadline:'2027.02', pct:20 },
+    { id:'g3', icon:'📊', name:'CFA Level 1', deadline:'2027.12', pct:0 },
+    { id:'g4', icon:'💰', name:'자산 10억', deadline:'2030.12', pct:55 }
   ];
-}
-
-function getDefaultProfile() {
-  return {
-    name:'위효연', asset: 550000000, targetAsset: 5000000000000000,
-    saju: '병인년 계사월 갑인일 기사시', daewoon:'정유대운(~2036)', birth:'1986-05-10'
-  };
 }

@@ -1,86 +1,83 @@
-// Firebase configuration — replace with your Firebase project credentials
-// 설정 방법: https://console.firebase.google.com > 프로젝트 생성 > 웹 앱 추가
+// Firebase configuration — life-os-be1e0
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 
-// ⚠️ 아래 설정을 본인의 Firebase 프로젝트 설정으로 교체하세요
-const FIREBASE_CONFIG = {
-  apiKey: localStorage.getItem('fb_apiKey') || '',
-  authDomain: localStorage.getItem('fb_authDomain') || '',
-  projectId: localStorage.getItem('fb_projectId') || '',
-  storageBucket: localStorage.getItem('fb_storageBucket') || '',
-  messagingSenderId: localStorage.getItem('fb_messagingSenderId') || '',
-  appId: localStorage.getItem('fb_appId') || ''
+const firebaseConfig = {
+  apiKey: "AIzaSyCOnFGSxz9G62JStorc4T4FFidimIrllMA",
+  authDomain: "life-os-be1e0.firebaseapp.com",
+  projectId: "life-os-be1e0",
+  storageBucket: "life-os-be1e0.firebasestorage.app",
+  messagingSenderId: "750419818481",
+  appId: "1:750419818481:web:8d9deebdafeb3e5e6bf650",
+  measurementId: "G-Z08QKY261H"
 };
 
-let app = null, db = null, auth = null;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let messaging = null;
+
+try { messaging = getMessaging(app); } catch(e) { console.warn('FCM not available:', e); }
+
 let currentUser = null;
-let isFirebaseReady = false;
 
-function tryInitFirebase() {
-  if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) return false;
-  try {
-    app = initializeApp(FIREBASE_CONFIG);
-    db = getFirestore(app);
-    auth = getAuth(app);
-    isFirebaseReady = true;
-    return true;
-  } catch(e) { console.warn('Firebase init failed:', e); return false; }
-}
-
-tryInitFirebase();
+onAuthStateChanged(auth, user => { currentUser = user; });
 
 export const FB = {
-  isReady: () => isFirebaseReady,
+  isReady: () => true,
   getUser: () => currentUser,
-  
+
   async signInGoogle() {
-    if (!isFirebaseReady) return null;
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     currentUser = result.user;
     return currentUser;
   },
-  
+
   async signOut() {
-    if (!isFirebaseReady || !auth) return;
     await signOut(auth);
     currentUser = null;
   },
-  
-  onAuthChange(callback) {
-    if (!isFirebaseReady || !auth) return;
-    onAuthStateChanged(auth, user => {
-      currentUser = user;
-      callback(user);
-    });
-  },
-  
-  async save(collection_name, docId, data) {
-    if (!isFirebaseReady || !currentUser || !db) return false;
+
+  onAuthChange(cb) { onAuthStateChanged(auth, user => { currentUser = user; cb(user); }); },
+
+  async save(col, docId, data) {
+    if (!currentUser) return false;
     try {
-      const ref = doc(db, 'users', currentUser.uid, collection_name, docId);
-      await setDoc(ref, { ...data, updatedAt: Date.now() }, { merge: true });
+      await setDoc(doc(db, 'users', currentUser.uid, col, docId), { ...data, _ts: Date.now() }, { merge: true });
       return true;
-    } catch(e) { console.error('FB save error:', e); return false; }
+    } catch(e) { console.error('FB save:', e); return false; }
   },
-  
-  async load(collection_name, docId) {
-    if (!isFirebaseReady || !currentUser || !db) return null;
+
+  async load(col, docId) {
+    if (!currentUser) return null;
     try {
-      const ref = doc(db, 'users', currentUser.uid, collection_name, docId);
-      const snap = await getDoc(ref);
+      const snap = await getDoc(doc(db, 'users', currentUser.uid, col, docId));
       return snap.exists() ? snap.data() : null;
-    } catch(e) { console.error('FB load error:', e); return null; }
+    } catch(e) { console.error('FB load:', e); return null; }
   },
-  
-  setConfig(cfg) {
-    Object.entries(cfg).forEach(([k,v]) => localStorage.setItem('fb_'+k, v));
-    FIREBASE_CONFIG.apiKey = cfg.apiKey || '';
-    FIREBASE_CONFIG.projectId = cfg.projectId || '';
-    FIREBASE_CONFIG.authDomain = cfg.authDomain || '';
-    tryInitFirebase();
+
+  // FCM 푸시 알림 토큰 등록
+  async registerFCM() {
+    if (!messaging || !currentUser) return null;
+    try {
+      // VAPID key는 Firebase Console > 프로젝트 설정 > Cloud Messaging > 웹 푸시 인증서에서 생성
+      const token = await getToken(messaging, {
+        vapidKey: localStorage.getItem('fcm_vapid') || ''
+      });
+      if (token) {
+        await this.save('meta', 'fcm', { token, updatedAt: Date.now() });
+        console.log('FCM token registered');
+      }
+      return token;
+    } catch(e) { console.warn('FCM token failed:', e); return null; }
+  },
+
+  onMessage(cb) {
+    if (!messaging) return;
+    onMessage(messaging, cb);
   }
 };
 

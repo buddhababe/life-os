@@ -78,7 +78,12 @@
   </nav>
 </div>
 
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('firebase-messaging-sw.js');
+  }
+</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

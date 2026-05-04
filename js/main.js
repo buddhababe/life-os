@@ -413,7 +413,16 @@ function submitGate() {
 window.switchToCore = () => switchTab('core');
 window.reqNotif = async () => {
   const perm = await Notification.requestPermission();
-  if (perm === 'granted') scheduleNotifications();
+  if (perm === 'granted') {
+    // FCM 토큰 등록 (앱 꺼져도 알림 수신)
+    try {
+      const { FB } = await import('./firebase-init.js');
+      const token = await FB.registerFCM();
+      if (token) console.log('[FCM] Push registered ✅');
+    } catch(e) { console.warn('FCM register failed:', e); }
+    // 로컬 스케줄 알림도 설정 (백업)
+    scheduleNotifications();
+  }
   render();
 };
 window.editCell = (idx) => {

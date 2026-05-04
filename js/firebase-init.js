@@ -65,7 +65,7 @@ export const FB = {
     try {
       // VAPID key는 Firebase Console > 프로젝트 설정 > Cloud Messaging > 웹 푸시 인증서에서 생성
       const token = await getToken(messaging, {
-        vapidKey: localStorage.getItem('fcm_vapid') || ''
+        vapidKey: 'BJbvsOUYn3pzXqqz0avLlQqrbBuDVOK01IAdYtxzvCmmIP7gJfCgBHfSAnPBNFatog8ezPt4d30Mu4fVc_i1qao'
       });
       if (token) {
         await this.save('meta', 'fcm', { token, updatedAt: Date.now() });

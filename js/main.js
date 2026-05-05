@@ -379,7 +379,7 @@ async function loadPortfolioUI(force=false) {
   const el = document.getElementById('pf-container');
   if (!el) return;
   if (_pfData && !force) {
-    el.innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRate, false);
+    el.innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRates, false);
     return;
   }
   el.innerHTML = renderPortfolioSection([], 0, 1380, true);
@@ -389,7 +389,7 @@ async function loadPortfolioUI(force=false) {
       const p = Store.getProfile(); p.asset = _pfData.total; Store.setProfile(p);
     }
     if (document.getElementById('pf-container')) {
-      document.getElementById('pf-container').innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRate, false);
+      document.getElementById('pf-container').innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRates, false);
     }
   } catch(e) {
     if (document.getElementById('pf-container'))

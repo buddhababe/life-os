@@ -45,44 +45,32 @@ async function fetchQuote(ticker) {
   } catch { return null; }
 }
 
-async function getUsdKrw() {
-  const cacheKey = 'pf_fx_usdkrw';
+async function getFxRates() {
+  const cacheKey = 'pf_fx_rates';
   const cached = getKey(cacheKey);
-  if (cached && Date.now() - cached.ts < FX_TTL) return cached.rate;
+  if (cached && Date.now() - cached.ts < FX_TTL) return cached.rates;
 
-  // FMP Forex or fallback
-  const key = apiKey();
-  if (key) {
-    try {
-      const res = await fetch(`${FMP_BASE}/quote?symbol=USDKRW&apikey=${key}`);
-      if (res.ok) {
-        const d = await res.json();
-        const q = Array.isArray(d) ? d[0] : d;
-        if (q?.price) {
-          setKey(cacheKey, { ts: Date.now(), rate: q.price });
-          return q.price;
-        }
-      }
-    } catch {}
-  }
+  let usd = 1380, jpy = 9.0;
   // Exchangerate fallback (free, no key needed)
   try {
     const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     if (res.ok) {
       const d = await res.json();
-      const rate = d?.rates?.KRW || 1380;
-      setKey(cacheKey, { ts: Date.now(), rate });
-      return rate;
+      if (d?.rates?.KRW) usd = d.rates.KRW;
+      if (d?.rates?.JPY) jpy = usd / d.rates.JPY; // cross rate (1 JPY = ? KRW)
     }
   } catch {}
-  return 1380; // static fallback
+  
+  const rates = { USD: usd, JPY: jpy, KRW: 1 };
+  setKey(cacheKey, { ts: Date.now(), rates });
+  return rates;
 }
 
 // ─── Calculate total ──────────────────────────────────────────
 export async function calcPortfolioTotal(onProgress) {
   const holdings = Portfolio.getHoldings();
   const cash     = Portfolio.getCash();
-  const fxRate   = await getUsdKrw();
+  const fxRates  = await getFxRates();
 
   let total = cash;
   const details = [];
@@ -96,12 +84,13 @@ export async function calcPortfolioTotal(onProgress) {
     }
     const priceLocal = q.price;
     const valueLocal = priceLocal * h.quantity;
-    const valueKrw   = h.currency === 'USD' ? valueLocal * fxRate : valueLocal;
+    const rate       = fxRates[h.currency] || 1;
+    const valueKrw   = valueLocal * rate;
     total += valueKrw;
-    details.push({ ...h, price: priceLocal, priceChange: q.changesPercentage, valueKrw, fxRate });
+    details.push({ ...h, price: priceLocal, priceChange: q.changesPercentage, valueKrw, fxRate: rate });
   }
 
-  return { total: Math.round(total), details, fxRate, updatedAt: Date.now() };
+  return { total: Math.round(total), details, fxRates, updatedAt: Date.now() };
 }
 
 // ─── UI helpers ───────────────────────────────────────────────
@@ -112,7 +101,7 @@ export function formatKrw(n) {
   return n.toLocaleString();
 }
 
-export function renderPortfolioSection(details, total, fxRate, loading) {
+export function renderPortfolioSection(details, total, fxRates, loading) {
   if (loading) return `<div class="pf-loading">⏳ 시세 조회 중...</div>`;
 
   const hasFmpKey = !!apiKey();
@@ -120,7 +109,7 @@ export function renderPortfolioSection(details, total, fxRate, loading) {
     return `
     <div class="card" style="margin-top:12px">
       <div class="card-title">📊 포트폴리오 연동</div>
-      <p style="color:var(--text2);font-size:13px;margin:8px 0">FMP API 키를 입력하면 실시간 시세 연동됩니다.</p>
+      <p style="color:var(--text2);font-size:13px;margin:8px 0">FMP API 키를 입력하면 한국(.KS/.KQ), 일본(.T), 미국 실시간 시세가 연동됩니다.</p>
       <input class="input" id="pf-fmp-key" placeholder="FMP API Key" style="margin-bottom:8px">
       <button class="btn btn-water btn-full" onclick="saveFmpKey()">연결</button>
       <p style="color:var(--text2);font-size:11px;margin-top:6px">
@@ -150,7 +139,7 @@ export function renderPortfolioSection(details, total, fxRate, loading) {
     </div>
     <div class="pf-header">
       <div class="pf-total">${formatKrw(total)}</div>
-      <div class="pf-sub">USD/KRW ${Math.round(fxRate).toLocaleString()} · 현금 ${formatKrw(cash)}</div>
+      <div class="pf-sub">USD ${Math.round(fxRates?.USD||1380).toLocaleString()} · JPY ${(fxRates?.JPY||9.0).toFixed(2)} · 현금 ${formatKrw(cash)}</div>
     </div>
     <div class="pf-list">${rows}</div>
     <button class="btn btn-ghost btn-full" style="margin-top:8px;font-size:12px" onclick="refreshPortfolio()">🔄 새로고침</button>
@@ -169,6 +158,7 @@ export function renderPortfolioEditor() {
       <select class="input" style="width:70px" onchange="pfUpdateField(${i},'currency',this.value)">
         <option value="USD" ${h.currency==='USD'?'selected':''}>USD</option>
         <option value="KRW" ${h.currency==='KRW'?'selected':''}>KRW</option>
+        <option value="JPY" ${h.currency==='JPY'?'selected':''}>JPY</option>
       </select>
       <button class="btn" style="padding:4px 8px;color:#f87171" onclick="pfRemove(${i})">✕</button>
     </div>`).join('');

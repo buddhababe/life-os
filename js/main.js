@@ -318,9 +318,10 @@ function renderToday() {
   const canStartFlow = flowState === 'Flow';
 
   html += `
-  <div class="section-head">🔥 2D 몰입 (Flow) 매트릭스</div>
+  <div class="section-head">🔥 2D 몰입 (Flow) 진단기</div>
   <div class="card" style="text-align:center;">
     <div style="font-size:11px;color:var(--text2);margin-bottom:8px">오늘의 #1 행동: <b>${gate.priority}</b></div>
+    <div style="font-size:10px;color:var(--water);margin-bottom:12px">작업을 시작하고, 진행 중인 감정 상태를 진단해 보세요.</div>
     
     <!-- Matrix Graphic -->
     <div class="flow-matrix-wrap">
@@ -346,11 +347,11 @@ function renderToday() {
     </div>
 
     <!-- State message -->
-    <div style="margin-top:12px;font-size:12px;color:${canStartFlow?'var(--water)':'var(--fire)'};font-weight:700">${flowState}: ${flowMsg}</div>
+    <div style="margin-top:12px;font-size:12px;color:${flowState==='Flow'?'var(--water)':'var(--fire)'};font-weight:700">${flowState}: ${flowMsg}</div>
     
     <div id="flow-display" style="font-size:42px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;margin-top:12px">${formatTime(flowSeconds)}</div>
-    <button class="btn ${isFlowing ? 'btn-fire' : 'btn-water'} mt8" onclick="window.toggleFlow()" style="width:100%;font-weight:700" ${!canStartFlow && !isFlowing ? 'disabled' : ''}>
-      ${isFlowing ? '■ 딥워크 정지' : '▶ 딥워크 타이머 시작'}
+    <button class="btn ${isFlowing ? 'btn-fire' : 'btn-water'} mt8" onclick="window.toggleFlow()" style="width:100%;font-weight:700">
+      ${isFlowing ? '■ 딥워크 정지 및 기록' : '▶ 무조건 시작하기'}
     </button>
   </div>
   `;

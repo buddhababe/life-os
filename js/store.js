@@ -58,6 +58,14 @@ export const Store = {
   getEvolutionState: () => get('evo_state', { lastRun:0, reports:[] }),
   setEvolutionState: (s) => { set('evo_state', s); sync('meta','evolution',s); },
 
+  // Ikigai (Vision)
+  getIkigai: () => get('ikigai', defaultIkigai()),
+  setIkigai: (i) => { set('ikigai', i); sync('meta','ikigai',i); },
+
+  // WOOP (Strategy)
+  getWoop: () => get('woop', defaultWoop()),
+  setWoop: (w) => { set('woop', w); sync('meta','woop',w); },
+
   // Stats
   getStreak(habitId) {
     let s = 0;
@@ -85,7 +93,7 @@ export const Store = {
   async syncAll() {
     if (!FB.isReady()||!FB.getUser()) return;
     // Pull from Firestore if newer
-    for (const k of ['habits','goals','mandarat','profile']) {
+    for (const k of ['habits','goals','mandarat','profile','ikigai','woop']) {
       const r = await FB.load('meta', k).catch(()=>null);
       if (r) set(k, r);
     }
@@ -116,4 +124,23 @@ function defaultGoals() {
     { id:'g3', icon:'📊', name:'CFA Level 1', deadline:'2027.12', pct:0 },
     { id:'g4', icon:'💰', name:'자산 10억', deadline:'2030.12', pct:55 }
   ];
+}
+
+function defaultIkigai() {
+  return {
+    love: '진리 탐구, AI, 주식 시장 분석, 법적/논리적 문제 해결',
+    goodAt: '시스템 설계, 데이터 분석, 자기 성찰, 지구력',
+    worldNeeds: '인공지능과 금융/법률을 융합한 자동화 플랫폼, 올바른 투자 철학',
+    paidFor: '퀀트 시스템, Legal-AI 서비스, CFA 자격',
+    ikigai: 'AI와 금융/법을 결합해 세상을 최적화하는 The One'
+  };
+}
+
+function defaultWoop() {
+  return {
+    wish: '가장 강력한 AI 금융/법률 시스템 구축 및 5경원 자산',
+    outcome: '완벽한 통제력과 자유, The One으로서의 완성',
+    obstacle: '기신운(화/토)에 의한 조급함, 충동적 감정, 게으름',
+    plan: '불안/충동이 올라오면 즉시 10분 명상(수)을 하고, 환경을 통제한다.'
+  };
 }

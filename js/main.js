@@ -1,13 +1,19 @@
-// MAIN ENTRY — Life OS v2.0
+// MAIN ENTRY — Life OS v2.0 (Top-Down Architecture)
 import { getDayGanjio, getDayRating, getYongshinActivities, DAEWOON } from './saju.js';
 import { Store } from './store.js';
 import { engine } from './evolution.js';
 import { Portfolio, calcPortfolioTotal, renderPortfolioSection, renderPortfolioEditor } from './portfolio.js';
 
 const today = new Date();
-let currentTab = 'gate';
+const todayKey = today.toISOString().slice(0,10);
+let currentTab = 'today';
 let isTinyMode = false;
 let _pfData = null;
+
+// Flow Timer state
+let flowSeconds = 0;
+let flowInterval = null;
+let isFlowing = false;
 
 // ─── BOOT ───
 window.addEventListener('load', async () => {
@@ -48,10 +54,11 @@ async function showApp() {
   requestNotificationPermission();
   const evoResult = await engine.autoCheck();
   window._evo = evoResult;
-  const todayKey = today.toISOString().slice(0,10);
+  
+  // Decide starting tab based on Gate
   const gate = Store.getGate(todayKey);
-  if (!gate.done) { switchTab('gate'); }
-  else { switchTab(today.getHours() >= 20 ? 'reflect' : 'core'); }
+  currentTab = 'today';
+  switchTab(currentTab);
   setInterval(updateHeader, 60000);
 }
 
@@ -92,184 +99,200 @@ function render() {
   const div = document.createElement('div');
   div.className = 'page-enter';
   switch(currentTab) {
-    case 'gate':    div.innerHTML = renderGate(); break;
-    case 'core':    div.innerHTML = renderCore(); break;
-    case 'reflect': div.innerHTML = renderReflect(); break;
-    case 'evolve':  div.innerHTML = renderEvolve(); break;
+    case 'vision':   div.innerHTML = renderVision(); break;
+    case 'strategy': div.innerHTML = renderStrategy(); break;
+    case 'today':    div.innerHTML = renderToday(); break;
+    case 'evolve':   div.innerHTML = renderEvolve(); break;
   }
   el.appendChild(div);
   bindEvents();
   if (currentTab === 'evolve') loadPortfolioUI();
 }
 
-// ─── GATE ───
-function renderGate() {
-  const todayKey = today.toISOString().slice(0,10);
-  const gate = Store.getGate(todayKey);
-  const rating = getDayRating(today);
-  const activities = getYongshinActivities(rating).slice(0,3);
-  const profile = Store.getProfile();
-  const pct = (profile.asset / profile.targetAsset * 100).toFixed(5);
-  const notifGranted = Notification.permission === 'granted';
+// ─── 1. VISION (비전) ───
+function renderVision() {
+  const i = Store.getIkigai();
+  return `
+  <div class="identity-bar" style="margin-bottom:16px">
+    <div class="ib-vote">트랜서핑 목표 슬라이드 (The Slide)</div>
+    <div class="ib-text" style="font-size:16px">"나는 이미<br><span style="color:var(--gold)">${i.ikigai}</span>이다."</div>
+  </div>
+  <div class="section-head">🌸 이키가이 (Ikigai)</div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--text2)">❤️ 좋아하는 것 (Love)</div>
+    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.love}</div>
+    <div style="font-size:11px;color:var(--text2)">💪 잘하는 것 (Good At)</div>
+    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.goodAt}</div>
+    <div style="font-size:11px;color:var(--text2)">🌍 세상이 필요로 하는 것 (World Needs)</div>
+    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.worldNeeds}</div>
+    <div style="font-size:11px;color:var(--text2)">💰 돈이 되는 것 (Paid For)</div>
+    <div style="font-weight:700;font-size:14px">${i.paidFor}</div>
+  </div>
+  <div class="saju-band sb-a" style="margin-top:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1)">
+    <div class="sb-icon">🕊️</div>
+    <div class="sb-text">
+      <div class="sb-label">중요도 낮추기 (Dropping Importance)</div>
+      목표에 대한 과도한 집착을 버려라. 세상은 거울이다. 이미 이룬 자처럼 가볍게 선택하라.
+    </div>
+  </div>
+  <button class="btn btn-water btn-full mt16" onclick="window.editIkigai()">✏️ 이키가이 수정</button>
+  `;
+}
 
-  if (gate.done) {
-    return `
-    <div class="the-one-bar">
-      <div class="tob-label">The One까지</div>
-      <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)}</div>
-      <div class="tob-sub">현재 ${formatAsset(profile.asset)} / 목표 ${formatAsset(profile.targetAsset)}</div>
-      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-    </div>
-    <div class="identity-bar">
-      <div class="ib-vote">정체성 확인</div>
-      <div class="ib-text">아침 게이트 완료 ✓<br>The One으로서 이 하루를 산다</div>
-      <div class="ib-count">에너지 ${gate.energy||'?'}/5 · #1: ${gate.priority||'?'}</div>
-    </div>
+// ─── 2. STRATEGY (전략) ───
+function renderStrategy() {
+  const w = Store.getWoop();
+  return `
+  <div class="section-head">🎯 만다라트 (The Blueprint)</div>
+  <div class="mandarat-wrap"><div class="mandarat-grid" id="mg">${renderMandaratGrid()}</div></div>
+  <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:8px">칸을 탭하여 세부 목표를 수정하세요.</div>
+
+  <div class="divider"></div>
+  <div class="section-head">🛡️ WOOP 심적 대비 (Mental Contrasting)</div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--text2)">WISH (소망)</div>
+    <div style="font-weight:700;margin-bottom:8px;color:var(--water)">${w.wish}</div>
+    <div style="font-size:11px;color:var(--text2)">OUTCOME (최상의 결과)</div>
+    <div style="font-weight:700;margin-bottom:12px">${w.outcome}</div>
+    <div style="font-size:11px;color:var(--fire)">OBSTACLE (장애물)</div>
+    <div style="font-weight:700;margin-bottom:8px">${w.obstacle}</div>
+    <div style="font-size:11px;color:var(--gold)">PLAN (If-Then 계획)</div>
+    <div style="font-weight:700">${w.plan}</div>
+  </div>
+  <button class="btn btn-ghost btn-full mt8" onclick="window.editWoop()">✏️ WOOP 수정</button>
+  `;
+}
+
+// ─── 3. TODAY (투데이) ───
+function renderToday() {
+  const gate = Store.getGate(todayKey);
+  const hour = today.getHours();
+  let html = '';
+
+  // 3-1. GATE (아침)
+  if (!gate.done) {
+    const rating = getDayRating(today);
+    const notifGranted = Notification.permission === 'granted';
+    html += `
     ${!notifGranted ? renderNotifPrompt() : ''}
-    <div class="saju-band sb-${rating.class}">
-      <div class="sb-icon">${rating.emoji}</div>
-      <div class="sb-text"><div class="sb-label">${rating.rating} · 오늘의 사주 조언</div>${rating.tip}</div>
+    <div class="gate-status">
+      <div class="gate-icon">🌅</div>
+      <div class="gate-title">나폴레온 힐 아침 암시</div>
+      <div class="gate-sub">명확한 목표를 잠재의식에 각인하라.</div>
     </div>
-    <div class="section-head mt16">🌊 용신 활동 추천</div>
-    ${activities.map(a=>`
-    <div class="card card-sm" style="display:flex;align-items:center;gap:12px">
-      <div style="font-size:22px">${a.icon}</div>
-      <div><div style="font-size:14px;font-weight:700">${a.name}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${a.desc}</div></div>
-    </div>`).join('')}
-    <button class="btn btn-water btn-full mt16" onclick="window.switchToCore()">핵심 습관으로 →</button>`;
+    <div class="identity-bar" style="margin-bottom:16px">
+      <div class="ib-vote">자기 암시 (Auto-Suggestion)</div>
+      <div class="ib-text">"나는 이미 The One이다.<br>오늘의 이 선택이 그 증거가 될 것이다."</div>
+    </div>
+    <div class="card">
+      <div class="card-title">① 오늘 에너지 레벨</div>
+      <div class="energy-sel" id="energy-sel">
+        ${[1,2,3,4,5].map(n=>`<button class="energy-opt" data-e="${n}">${['😴','😐','🙂','💪','⚡'][n-1]}<br><span style="font-size:10px">${n}</span></button>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">② 오늘의 #1 행동 (The One Thing)</div>
+      <input class="mb-input" id="priority-input" placeholder="오늘 반드시 할 단 하나" style="text-align:left;padding:10px 12px">
+    </div>
+    <div class="card">
+      <div class="card-title">③ 오늘의 의도 (한 단어)</div>
+      <input class="mb-input" id="intention-input" placeholder="집중 / 인내 / 전진 / 수련...">
+    </div>
+    <button class="btn btn-gold btn-full" id="gate-submit" style="margin-top:4px">✓ 게이트 통과 — 잠재의식 각인</button>
+    `;
+    return html;
   }
 
-  return `
-  ${!notifGranted ? renderNotifPrompt() : ''}
-  <div class="gate-status">
-    <div class="gate-icon">🌅</div>
-    <div class="gate-title">아침 게이트</div>
-    <div class="gate-sub">60초. 하루를 설계하는 시간.</div>
-  </div>
-  <div class="identity-bar" style="margin-bottom:16px">
-    <div class="ib-vote">정체성 선언</div>
-    <div class="ib-text">"나는 Charlie Wi 무생이다.<br>나는 The One이다.<br>오늘의 행동이 그 증거다."</div>
-  </div>
-  <div class="card">
-    <div class="card-title">① 오늘 에너지 레벨</div>
-    <div class="energy-sel" id="energy-sel">
-      ${[1,2,3,4,5].map(n=>`<button class="energy-opt" data-e="${n}">${['😴','😐','🙂','💪','⚡'][n-1]}<br><span style="font-size:10px">${n}</span></button>`).join('')}
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">② 오늘의 #1 행동</div>
-    <input class="mb-input" id="priority-input" placeholder="오늘 반드시 할 단 하나" style="text-align:left;padding:10px 12px">
-  </div>
-  <div class="card">
-    <div class="card-title">③ 오늘의 의도 (한 단어)</div>
-    <input class="mb-input" id="intention-input" placeholder="집중 / 인내 / 전진 / 수련...">
-  </div>
-  <button class="btn btn-gold btn-full" id="gate-submit" style="margin-top:4px">
-    ✓ 게이트 통과 — The One이다
-  </button>`;
-}
-
-function renderNotifPrompt() {
-  return `<div class="notif-prompt">
-    <div class="np-icon">🔔</div>
-    <div class="np-text"><b>알람 권한</b> 허용하면<br>아침·저녁 자동 알림을 받습니다</div>
-    <button class="np-btn" onclick="window.reqNotif()">허용</button>
-  </div>`;
-}
-
-// ─── CORE ───
-function renderCore() {
+  // 3-2. FLOW & HABITS (낮)
   const habits = Store.getHabits();
   const comps = Store.getCompletions();
   const rating = getDayRating(today);
   const doneCount = habits.filter(h => comps[h.id]).length;
   const allDone = doneCount === habits.length;
   const autoTiny = rating.score <= -2;
+  const formatTime = (sec) => {
+    const m = Math.floor(sec/60).toString().padStart(2,'0');
+    const s = (sec%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  };
 
-  return `
-  <div class="identity-bar">
-    <div class="ib-vote">정체성 확인</div>
-    <div class="ib-text">오늘 <b style="color:var(--water)">${doneCount}/${habits.length}</b>개 완료 — ${allDone ? '✅ The One으로서 살았다' : 'The One은 지금 이 순간에도 행동한다'}</div>
+  html += `
+  <div class="card" style="text-align:center;background:linear-gradient(180deg, rgba(64,196,255,0.05) 0%, rgba(0,0,0,0) 100%); border-top: 2px solid var(--water)">
+    <div style="font-size:12px;color:var(--water);font-weight:700;letter-spacing:1px;margin-bottom:8px">🔥 FLOW TIMER (미하이 칙센트미하이)</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">오늘의 #1 행동: <b>${gate.priority}</b></div>
+    <div id="flow-display" style="font-size:42px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">${formatTime(flowSeconds)}</div>
+    <button class="btn ${isFlowing ? 'btn-fire' : 'btn-water'} mt16" onclick="window.toggleFlow()" style="width:120px;font-weight:700">
+      ${isFlowing ? '■ 정지' : '▶ 몰입 시작'}
+    </button>
+    <div style="font-size:10px;color:var(--text3);margin-top:12px">난이도와 실력의 밸런스를 맞추어 무아지경에 진입하라.</div>
   </div>
-  <div class="saju-band sb-${rating.class}" style="margin-bottom:12px">
-    <div class="sb-icon">${rating.emoji}</div>
-    <div class="sb-text">
-      <div class="sb-label">${rating.rating} — ${autoTiny ? '오늘은 TINY 버전이 최선이다' : 'FULL 버전을 실행한다'}</div>
-      ${autoTiny ? '기신일: 30초 TINY라도 완료하면 The One 확인 성공' : rating.tip}
-    </div>
+
+  <div class="section-head mt16" style="display:flex;justify-content:space-between;align-items:center">
+    <div>⚡ 실행 의도 (If-Then Habits)</div>
+    <div style="font-size:11px;font-weight:400;color:var(--text2)">${doneCount}/${habits.length} 완료</div>
   </div>
-  <div class="tiny-toggle">
-    <button class="tt-btn ${!isTinyMode && !autoTiny ? 'active' : ''}" id="btn-full-mode">💪 FULL 버전</button>
-    <button class="tt-btn ${isTinyMode || autoTiny ? 'active' : ''}" id="btn-tiny-mode">⚡ TINY 버전 (2분)</button>
+  
+  <div class="tiny-toggle" style="margin-bottom:12px">
+    <button class="tt-btn ${!isTinyMode && !autoTiny ? 'active' : ''}" id="btn-full-mode">💪 FULL 시스템</button>
+    <button class="tt-btn ${isTinyMode || autoTiny ? 'active' : ''}" id="btn-tiny-mode">⚡ TINY 습관 (원자적)</button>
   </div>
+  
   ${habits.map(h => {
     const done = !!comps[h.id];
     const streak = Store.getStreak(h.id);
-    const rate = Store.getWeeklyRate(h.id);
     const showTiny = isTinyMode || autoTiny;
     return `
     <div class="habit-row ${done ? 'done' : ''}" data-hid="${h.id}">
       <div class="hr-check">${done ? '✓' : ''}</div>
       <div class="hr-body">
         <div class="hr-name">${h.icon} ${h.name}</div>
-        <div class="hr-identity">↳ The One은 이것을 한다</div>
-        <div class="hr-tiny">${showTiny ? `⚡ TINY: ${h.tiny}` : `💪 FULL: ${h.target}`}</div>
+        <div class="hr-identity" style="color:var(--gold)">If: ${h.cue}</div>
+        <div class="hr-tiny">Then: ${showTiny ? `⚡ ${h.tiny}` : `💪 ${h.target}`}</div>
       </div>
       <div class="hr-right">
         <div class="hr-streak">${streak > 0 ? `🔥${streak}` : '0'}</div>
-        <div class="hr-rate">${rate}%/주</div>
       </div>
     </div>`;
   }).join('')}
-  ${allDone ? `
-  <div class="card" style="border-color:var(--success);text-align:center;margin-top:4px">
-    <div style="font-size:28px;margin-bottom:6px">🏆</div>
-    <div style="font-weight:800;color:var(--success)">오늘 모든 확인 완료</div>
-    <div style="font-size:12px;color:var(--text2);margin-top:4px">The One이다. 오늘도 증명했다.</div>
-  </div>` : ''}
-  <div class="divider"></div>
-  <div class="section-head">🎯 만다라트</div>
-  <div class="mandarat-wrap"><div class="mandarat-grid" id="mg">${renderMandaratGrid()}</div></div>`;
-}
+  `;
 
-// ─── REFLECT ───
-function renderReflect() {
-  const todayKey = today.toISOString().slice(0,10);
+  // 3-3. REFLECT (저녁)
   const saved = Store.getJournal(todayKey);
-  const habits = Store.getHabits();
-  const comps = Store.getCompletions();
-  const doneCount = habits.filter(h => comps[h.id]).length;
+  const showReflect = hour >= 20 || saved.q1;
+  
+  if (showReflect) {
+    html += `
+    <div class="divider"></div>
+    <div class="gate-status" style="margin-bottom:16px">
+      <div class="gate-icon">🌙</div>
+      <div class="gate-title">CBT 성찰 리프레이밍</div>
+      <div class="gate-sub">하루의 감정과 인지 오류를 교정하다.</div>
+    </div>
+    <form id="reflect-form">
+      ${[
+        {id:'q1', icon:'🌊', label:'오늘 The One의 증거 1가지?', hint:'가장 작고 확실한 성공의 기록'},
+        {id:'q2', icon:'🔥', label:'발견된 인지 오류나 재극인 감정?', hint:'조급함, 흑백논리, 충동적 판단을 객관화'},
+        {id:'q3', icon:'⭐', label:'내일을 위한 개선점 (Plan)', hint:'구체적인 행동 레벨의 수정안'}
+      ].map(q=>`
+      <div class="reflect-q">
+        <div class="rq-label">${q.icon} ${q.label}</div>
+        <textarea class="rq-ta" id="rq_${q.id}" placeholder="${q.hint}">${saved[q.id]||''}</textarea>
+      </div>`).join('')}
+      <button type="submit" class="btn btn-water btn-full mt8">💾 인지 교정 및 저장</button>
+    </form>
+    `;
+  } else {
+    html += `
+    <div class="card mt16" style="text-align:center;border:1px dashed rgba(255,255,255,0.1)">
+      <div style="font-size:12px;color:var(--text3)">저녁 8시 이후 성찰 메뉴가 활성화됩니다.</div>
+    </div>
+    `;
+  }
 
-  return `
-  <div class="identity-bar">
-    <div class="ib-vote">저녁 성찰</div>
-    <div class="ib-text">오늘 ${doneCount}/${habits.length}개 완료<br>"기록하지 않으면 존재하지 않는다"</div>
-  </div>
-  <form id="reflect-form">
-    ${[
-      {id:'q1', icon:'🌊', label:'오늘 The One임을 확인한 행동 1가지?', hint:'수영 완료, 공부 2시간, 물 2L...'},
-      {id:'q2', icon:'🔥', label:'재극인(土/火) 행동을 했나?', hint:'충동 구매, 감정적 결정, 무의미한 SNS...'},
-      {id:'q3', icon:'⭐', label:'내일 #1 행동?', hint:'구체적으로. "CFA 2시간" ○ / "열심히" ✗'}
-    ].map(q=>`
-    <div class="reflect-q">
-      <div class="rq-label">${q.icon} ${q.label}</div>
-      <textarea class="rq-ta" id="rq_${q.id}" placeholder="${q.hint}">${saved[q.id]||''}</textarea>
-    </div>`).join('')}
-    <button type="submit" class="btn btn-water btn-full">💾 저장 · 내일을 설계하다</button>
-  </form>
-  <div class="divider"></div>
-  <div class="section-head">🙏 불교 수행 · 오늘의 수련</div>
-  ${[
-    {icon:'🧘',name:'마음챙김 명상 10분',desc:'팔정도 正念. 화기 억제 최강'},
-    {icon:'🌊',name:'수분 2L 확인',desc:'癸水 직접 보충. 용신 물상'},
-    {icon:'⚪',name:'내일 운동복 꺼내두기',desc:'Fogg 환경설계. 마찰 제거'}
-  ].map(a=>`<div class="card card-sm" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-    <div style="font-size:20px">${a.icon}</div>
-    <div><div style="font-weight:700;font-size:14px">${a.name}</div><div style="font-size:11px;color:var(--text2);margin-top:1px">${a.desc}</div></div>
-  </div>`).join('')}`;
+  return html;
 }
 
-// ─── EVOLVE ───
+// ─── 4. EVOLVE (진화) ───
 function renderEvolve() {
   const evo = window._evo;
   const report = engine.getLatestReport();
@@ -279,11 +302,13 @@ function renderEvolve() {
   return `
   <div class="evo-score">
     <div class="es-num">${report?.score?.total || 0}</div>
-    <div class="es-label">진화 점수 / 100</div>
+    <div class="es-label">시스템 진화 점수 / 100</div>
   </div>
+  
+  <div class="section-head">💰 자산 인프라</div>
   <div class="the-one-bar">
-    <div class="tob-label">The One까지</div>
-    <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)}</div>
+    <div class="tob-label">자산 목표 달성도</div>
+    <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)} 남음</div>
     <div class="tob-sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       현재 <b style="color:var(--water)">${formatAsset(profile.asset)}</b>
       <button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.manualAsset()">✏️ 자산</button>
@@ -296,22 +321,22 @@ function renderEvolve() {
   <div id="pf-container"><div class="card" style="color:var(--text2);text-align:center">📊 포트폴리오 로딩 중...</div></div>
 
   ${evo?.insights?.length ? `
-  <div class="section-head">⚡ 이번 주 인사이트</div>
+  <div class="section-head mt16">⚡ AI 시스템 진단</div>
   ${evo.insights.slice(0,5).map(i=>`
   <div class="insight-row ir-${i.level}">
     <div class="ir-title" style="color:${i.level==='success'?'var(--success)':i.level==='warning'?'var(--gold)':'var(--fire)'}">${i.type.replace(/_/g,' ')}</div>
     <div class="ir-msg">${i.message}</div>
   </div>`).join('')}
-  <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center">자동 적용: ${evo.actions?.length||0}개 · 다음 분석: D-${daysLeft}</div>
+  <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center">자동 반영: ${evo.actions?.length||0}개 · 다음 분석: D-${daysLeft}</div>
   ` : `
-  <div class="card" style="text-align:center;padding:24px">
+  <div class="card mt16" style="text-align:center;padding:24px">
     <div style="font-size:32px;margin-bottom:8px">⏳</div>
     <div style="font-weight:700">데이터 수집 중</div>
-    <div style="font-size:12px;color:var(--text2);margin-top:6px">3일 이상 기록하면 첫 자가분석이 실행됩니다</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:6px">3일 이상 기록하면 첫 AI 자가진단이 실행됩니다</div>
   </div>`}
 
   <div class="divider"></div>
-  <div class="section-head">☯ 대운 타임라인</div>
+  <div class="section-head">☯ 사주 대운 타임라인</div>
   <div class="dw-timeline">
     ${DAEWOON.map(d=>`
     <div class="dw-item ${d.active?'active':''}">
@@ -320,9 +345,11 @@ function renderEvolve() {
       <div class="dw-desc" style="color:${d.color}">${d.desc}</div>
     </div>`).join('')}
   </div>
+  
   <div class="divider"></div>
-  <div class="section-head">⚙ 설정</div>
-  <button class="btn btn-gold btn-full mt8" onclick="window.forceEvolve()">🔄 자가진화 지금 실행</button>`;
+  <button class="btn btn-gold btn-full mt8" onclick="window.forceEvolve()">🔄 자가진화 수동 실행</button>
+  <div style="text-align:center;margin-top:20px;font-size:10px;color:var(--text3)">Life OS v2.0 - Ikigai & Flow Architecture</div>
+  `;
 }
 
 // ─── MANDARAT ───
@@ -359,7 +386,8 @@ function bindEvents() {
     e.preventDefault();
     const data = { q1: document.getElementById('rq_q1').value, q2: document.getElementById('rq_q2').value, q3: document.getElementById('rq_q3').value };
     Store.setJournal(data);
-    alert('✅ 저장됐습니다.');
+    alert('✅ 인지 교정 및 성찰이 저장되었습니다.');
+    render();
   });
 }
 
@@ -369,7 +397,6 @@ function submitGate() {
   const intention = document.getElementById('intention-input')?.value.trim();
   if (!energy) { alert('에너지 레벨을 선택해주세요'); return; }
   if (!priority) { alert('오늘의 #1 행동을 입력해주세요'); return; }
-  const todayKey = today.toISOString().slice(0,10);
   Store.setGate(todayKey, { done: true, energy, priority, intention, ts: Date.now() });
   render();
 }
@@ -382,7 +409,7 @@ async function loadPortfolioUI(force=false) {
     el.innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRates, false);
     return;
   }
-  el.innerHTML = renderPortfolioSection([], 0, 1380, true);
+  el.innerHTML = renderPortfolioSection([], 0, {}, true);
   try {
     _pfData = await calcPortfolioTotal();
     if (_pfData.total > 0) {
@@ -398,7 +425,42 @@ async function loadPortfolioUI(force=false) {
 }
 
 // ─── GLOBALS ───
-window.switchToCore = () => switchTab('core');
+window.editIkigai = () => {
+  const i = Store.getIkigai();
+  const love = prompt('좋아하는 것', i.love) || i.love;
+  const goodAt = prompt('잘하는 것', i.goodAt) || i.goodAt;
+  const worldNeeds = prompt('세상이 필요로 하는 것', i.worldNeeds) || i.worldNeeds;
+  const paidFor = prompt('돈이 되는 것', i.paidFor) || i.paidFor;
+  const ikigai = prompt('이키가이 (The One)', i.ikigai) || i.ikigai;
+  Store.setIkigai({ love, goodAt, worldNeeds, paidFor, ikigai });
+  render();
+};
+window.editWoop = () => {
+  const w = Store.getWoop();
+  const wish = prompt('WISH (소망)', w.wish) || w.wish;
+  const outcome = prompt('OUTCOME (최상의 결과)', w.outcome) || w.outcome;
+  const obstacle = prompt('OBSTACLE (장애물)', w.obstacle) || w.obstacle;
+  const plan = prompt('PLAN (If-Then 계획)', w.plan) || w.plan;
+  Store.setWoop({ wish, outcome, obstacle, plan });
+  render();
+};
+window.toggleFlow = () => {
+  isFlowing = !isFlowing;
+  if (isFlowing) {
+    flowInterval = setInterval(() => {
+      flowSeconds++;
+      const el = document.getElementById('flow-display');
+      if (el) {
+        const m = Math.floor(flowSeconds/60).toString().padStart(2,'0');
+        const s = (flowSeconds%60).toString().padStart(2,'0');
+        el.textContent = `${m}:${s}`;
+      }
+    }, 1000);
+  } else {
+    clearInterval(flowInterval);
+  }
+  render();
+};
 window.manualAsset = () => {
   const asset = prompt('현재 자산 직접 입력 (원)', Store.getProfile().asset);
   if (asset) { const p = Store.getProfile(); p.asset = parseInt(asset); Store.setProfile(p); render(); }
@@ -472,6 +534,14 @@ window.saveFmpKey = () => {
 };
 window.refreshPortfolio = () => { _pfData = null; loadPortfolioUI(true); };
 
+function renderNotifPrompt() {
+  return `<div class="notif-prompt">
+    <div class="np-icon">🔔</div>
+    <div class="np-text"><b>알람 권한</b> 허용하면<br>아침·저녁 자동 알림을 받습니다</div>
+    <button class="np-btn" onclick="window.reqNotif()">허용</button>
+  </div>`;
+}
+
 // ─── NOTIFICATIONS ───
 async function requestNotificationPermission() { /* user triggers manually */ }
 
@@ -480,8 +550,8 @@ function scheduleNotifications() {
     navigator.serviceWorker.controller.postMessage({
       type: 'SCHEDULE_NOTIF',
       notifications: [
-        { hour: 6, min: 30, title: '☯ The One의 아침', body: '아침 게이트를 통과하라. 지금 시작하라.' },
-        { hour: 22, min: 0, title: '🌙 저녁 성찰', body: 'The One은 오늘을 기록한다.' }
+        { hour: 6, min: 30, title: '☯ The One의 아침', body: '아침 암시를 시작하라. 현실은 거울이다.' },
+        { hour: 22, min: 0, title: '🌙 저녁 성찰', body: 'CBT 리프레이밍. 오늘의 감정과 인지를 교정하라.' }
       ]
     });
   }

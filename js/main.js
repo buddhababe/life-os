@@ -140,7 +140,7 @@ function renderGate() {
     </div>
     <div class="identity-bar">
       <div class="ib-vote">오늘의 정체성 투표</div>
-      <div class="ib-text">아침 게이트 완료 ✓<br>The One에 한 표 투표했습니다</div>
+      <div class="ib-text">아침 게이트 완료 ✓<br>The One으로서 이 하루를 어댁다</div>
       <div class="ib-count">에너지 ${gate.energy || '?'}/5 · 오늘의 #1: ${gate.priority || '?'}</div>
     </div>
     ${!notifGranted ? renderNotifPrompt() : ''}
@@ -167,7 +167,7 @@ function renderGate() {
 
   <div class="identity-bar" style="margin-bottom:16px">
     <div class="ib-vote">정체성 선언</div>
-    <div class="ib-text">"나는 Charlie Wi 무생.<br>오늘의 행동이 The One을 만든다."</div>
+    <div class="ib-text">"나는 Charlie Wi 무생이다.<br>나는 The One이다.<br>오늘의 행동이 그 증거다."</div>
   </div>
 
   <div class="card">
@@ -214,8 +214,8 @@ function renderCore() {
 
   return `
   <div class="identity-bar">
-    <div class="ib-vote">정체성 투표 현황</div>
-    <div class="ib-text">오늘 <b style="color:var(--water)">${doneCount}/${habits.length}</b>개 완료 — ${allDone ? '✅ The One답게 살았다' : '계속 투표하라'}</div>
+    <div class="ib-vote">정체성 확인</div>
+    <div class="ib-text">오늘 <b style="color:var(--water)">${doneCount}/${habits.length}</b>개 완료 — ${allDone ? '✅ The One으로서 살았다' : 'The One은 지금 이 순간에도 행동한다'}</div>
   </div>
 
   <div class="saju-band sb-${rating.class}" style="margin-bottom:12px">

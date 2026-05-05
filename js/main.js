@@ -117,7 +117,7 @@ function renderGate() {
     <div class="the-one-bar">
       <div class="tob-label">The One까지</div>
       <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)}</div>
-      <div class="tob-sub">현재 ${formatAsset(profile.asset)} / 목표 5경원</div>
+      <div class="tob-sub">현재 ${formatAsset(profile.asset)} / 목표 ${formatAsset(profile.targetAsset)}</div>
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
     <div class="identity-bar">
@@ -285,8 +285,10 @@ function renderEvolve() {
     <div class="tob-label">The One까지</div>
     <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)}</div>
     <div class="tob-sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      현재 <b style="color:var(--water)">${formatAsset(profile.asset)}</b> · 목표 5경원
-      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.manualAsset()">✏️ 직접 입력</button>
+      현재 <b style="color:var(--water)">${formatAsset(profile.asset)}</b>
+      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.manualAsset()">✏️ 자산</button>
+      · 목표 <b style="color:var(--gold)">${formatAsset(profile.targetAsset)}</b>
+      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.manualTargetAsset()">✏️ 목표</button>
     </div>
     <div class="progress-track"><div class="progress-fill" style="width:${(profile.asset/profile.targetAsset*100).toFixed(5)}%"></div></div>
   </div>
@@ -400,6 +402,10 @@ window.switchToCore = () => switchTab('core');
 window.manualAsset = () => {
   const asset = prompt('현재 자산 직접 입력 (원)', Store.getProfile().asset);
   if (asset) { const p = Store.getProfile(); p.asset = parseInt(asset); Store.setProfile(p); render(); }
+};
+window.manualTargetAsset = () => {
+  const asset = prompt('목표 자산 직접 입력 (원)', Store.getProfile().targetAsset);
+  if (asset) { const p = Store.getProfile(); p.targetAsset = parseInt(asset); Store.setProfile(p); render(); }
 };
 window.reqNotif = async () => {
   const perm = await Notification.requestPermission();

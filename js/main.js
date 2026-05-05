@@ -1,23 +1,22 @@
 // MAIN ENTRY — Life OS v2.0
-import { getDayGanjio, getDayRating, getYongshinActivities, DAEWOON, getMonthCalendar } from './saju.js';
+import { getDayGanjio, getDayRating, getYongshinActivities, DAEWOON } from './saju.js';
 import { Store } from './store.js';
 import { engine } from './evolution.js';
+import { Portfolio, calcPortfolioTotal, renderPortfolioSection, renderPortfolioEditor } from './portfolio.js';
 
 const today = new Date();
 let currentTab = 'gate';
 let isTinyMode = false;
+let _pfData = null;
 
 // ─── BOOT ───
 window.addEventListener('load', async () => {
-  await sleep(1200); // splash
+  await sleep(1200);
   document.getElementById('splash').style.opacity = '0';
   await sleep(500);
   document.getElementById('splash').classList.add('hidden');
-
   const mode = localStorage.getItem('lifeos_mode');
-  if (mode) {
-    showApp();
-  } else {
+  if (mode) { showApp(); } else {
     document.getElementById('auth').classList.remove('hidden');
     setupAuth();
   }
@@ -25,17 +24,13 @@ window.addEventListener('load', async () => {
 
 function setupAuth() {
   document.getElementById('btn-google').onclick = async () => {
-    // Firebase Google sign-in (requires Firebase config)
     try {
       const { FB } = await import('./firebase-init.js');
       await FB.signInGoogle();
       localStorage.setItem('lifeos_mode', 'firebase');
       document.getElementById('auth').classList.add('hidden');
       showApp();
-    } catch(e) {
-      console.warn('Google sign-in failed, falling back to local:', e);
-      startLocal();
-    }
+    } catch(e) { startLocal(); }
   };
   document.getElementById('btn-local').onclick = startLocal;
 }
@@ -51,21 +46,12 @@ async function showApp() {
   updateHeader();
   setupNav();
   requestNotificationPermission();
-
-  // Auto-run evolution engine
   const evoResult = await engine.autoCheck();
   window._evo = evoResult;
-
-  // Determine best starting tab
   const todayKey = today.toISOString().slice(0,10);
   const gate = Store.getGate(todayKey);
-  if (!gate.done) {
-    switchTab('gate');
-  } else {
-    const hour = today.getHours();
-    switchTab(hour >= 20 ? 'reflect' : 'core');
-  }
-
+  if (!gate.done) { switchTab('gate'); }
+  else { switchTab(today.getHours() >= 20 ? 'reflect' : 'core'); }
   setInterval(updateHeader, 60000);
 }
 
@@ -75,19 +61,14 @@ function updateHeader() {
   const rating = getDayRating(today);
   const DAYS = ['일','월','화','수','목','금','토'];
   const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-
   document.getElementById('hdr-date').textContent =
     `${today.getFullYear()}년 ${MONTHS[today.getMonth()]} ${today.getDate()}일(${DAYS[today.getDay()]})`;
-
   const badge = document.getElementById('hdr-ganjio');
   badge.textContent = `${gj.gk}${gj.jk} ${rating.rating}`;
   badge.className = `hdr-badge badge-${rating.class}`;
-
-  // Best streak
   const habits = Store.getHabits();
   const maxStreak = habits.reduce((m,h) => Math.max(m, Store.getStreak(h.id)), 0);
-  document.getElementById('streak-display').innerHTML = maxStreak > 0
-    ? `🔥 ${maxStreak}일` : '';
+  document.getElementById('streak-display').innerHTML = maxStreak > 0 ? `🔥 ${maxStreak}일` : '';
 }
 
 // ─── NAV ───
@@ -118,9 +99,10 @@ function render() {
   }
   el.appendChild(div);
   bindEvents();
+  if (currentTab === 'evolve') loadPortfolioUI();
 }
 
-// ─── GATE (Morning Check-in) ───
+// ─── GATE ───
 function renderGate() {
   const todayKey = today.toISOString().slice(0,10);
   const gate = Store.getGate(todayKey);
@@ -139,9 +121,9 @@ function renderGate() {
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
     <div class="identity-bar">
-      <div class="ib-vote">오늘의 정체성 투표</div>
-      <div class="ib-text">아침 게이트 완료 ✓<br>The One으로서 이 하루를 어댁다</div>
-      <div class="ib-count">에너지 ${gate.energy || '?'}/5 · 오늘의 #1: ${gate.priority || '?'}</div>
+      <div class="ib-vote">정체성 확인</div>
+      <div class="ib-text">아침 게이트 완료 ✓<br>The One으로서 이 하루를 산다</div>
+      <div class="ib-count">에너지 ${gate.energy||'?'}/5 · #1: ${gate.priority||'?'}</div>
     </div>
     ${!notifGranted ? renderNotifPrompt() : ''}
     <div class="saju-band sb-${rating.class}">
@@ -164,32 +146,26 @@ function renderGate() {
     <div class="gate-title">아침 게이트</div>
     <div class="gate-sub">60초. 하루를 설계하는 시간.</div>
   </div>
-
   <div class="identity-bar" style="margin-bottom:16px">
     <div class="ib-vote">정체성 선언</div>
     <div class="ib-text">"나는 Charlie Wi 무생이다.<br>나는 The One이다.<br>오늘의 행동이 그 증거다."</div>
   </div>
-
   <div class="card">
     <div class="card-title">① 오늘 에너지 레벨</div>
     <div class="energy-sel" id="energy-sel">
       ${[1,2,3,4,5].map(n=>`<button class="energy-opt" data-e="${n}">${['😴','😐','🙂','💪','⚡'][n-1]}<br><span style="font-size:10px">${n}</span></button>`).join('')}
     </div>
   </div>
-
   <div class="card">
-    <div class="card-title">② 오늘의 #1 행동 (The One을 위해)</div>
+    <div class="card-title">② 오늘의 #1 행동</div>
     <input class="mb-input" id="priority-input" placeholder="오늘 반드시 할 단 하나" style="text-align:left;padding:10px 12px">
-    <div class="rq-hint mt8">CFA 공부 2시간 / 수영 / 이력서 작성 등</div>
   </div>
-
   <div class="card">
     <div class="card-title">③ 오늘의 의도 (한 단어)</div>
     <input class="mb-input" id="intention-input" placeholder="집중 / 인내 / 전진 / 수련...">
   </div>
-
   <button class="btn btn-gold btn-full" id="gate-submit" style="margin-top:4px">
-    ✓ 게이트 통과 — The One으로
+    ✓ 게이트 통과 — The One이다
   </button>`;
 }
 
@@ -201,15 +177,13 @@ function renderNotifPrompt() {
   </div>`;
 }
 
-// ─── CORE (Habits) ───
+// ─── CORE ───
 function renderCore() {
   const habits = Store.getHabits();
   const comps = Store.getCompletions();
   const rating = getDayRating(today);
   const doneCount = habits.filter(h => comps[h.id]).length;
   const allDone = doneCount === habits.length;
-
-  // Auto tiny mode on bad days
   const autoTiny = rating.score <= -2;
 
   return `
@@ -217,20 +191,17 @@ function renderCore() {
     <div class="ib-vote">정체성 확인</div>
     <div class="ib-text">오늘 <b style="color:var(--water)">${doneCount}/${habits.length}</b>개 완료 — ${allDone ? '✅ The One으로서 살았다' : 'The One은 지금 이 순간에도 행동한다'}</div>
   </div>
-
   <div class="saju-band sb-${rating.class}" style="margin-bottom:12px">
     <div class="sb-icon">${rating.emoji}</div>
     <div class="sb-text">
-      <div class="sb-label">${rating.rating} — ${autoTiny ? '오늘은 TINY 버전으로 충분하다' : '오늘은 FULL 버전을 목표로'}</div>
-      ${autoTiny ? '기신일: 30초 TINY라도 완료하면 The One 투표 성공' : rating.tip}
+      <div class="sb-label">${rating.rating} — ${autoTiny ? '오늘은 TINY 버전이 최선이다' : 'FULL 버전을 실행한다'}</div>
+      ${autoTiny ? '기신일: 30초 TINY라도 완료하면 The One 확인 성공' : rating.tip}
     </div>
   </div>
-
   <div class="tiny-toggle">
     <button class="tt-btn ${!isTinyMode && !autoTiny ? 'active' : ''}" id="btn-full-mode">💪 FULL 버전</button>
     <button class="tt-btn ${isTinyMode || autoTiny ? 'active' : ''}" id="btn-tiny-mode">⚡ TINY 버전 (2분)</button>
   </div>
-
   ${habits.map(h => {
     const done = !!comps[h.id];
     const streak = Store.getStreak(h.id);
@@ -250,20 +221,18 @@ function renderCore() {
       </div>
     </div>`;
   }).join('')}
-
   ${allDone ? `
   <div class="card" style="border-color:var(--success);text-align:center;margin-top:4px">
     <div style="font-size:28px;margin-bottom:6px">🏆</div>
-    <div style="font-weight:800;color:var(--success)">오늘 모든 투표 완료</div>
-    <div style="font-size:12px;color:var(--text2);margin-top:4px">The One이 되는 길을 걷고 있다</div>
+    <div style="font-weight:800;color:var(--success)">오늘 모든 확인 완료</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px">The One이다. 오늘도 증명했다.</div>
   </div>` : ''}
-
   <div class="divider"></div>
   <div class="section-head">🎯 만다라트</div>
   <div class="mandarat-wrap"><div class="mandarat-grid" id="mg">${renderMandaratGrid()}</div></div>`;
 }
 
-// ─── REFLECT (Evening) ───
+// ─── REFLECT ───
 function renderReflect() {
   const todayKey = today.toISOString().slice(0,10);
   const saved = Store.getJournal(todayKey);
@@ -276,11 +245,10 @@ function renderReflect() {
     <div class="ib-vote">저녁 성찰</div>
     <div class="ib-text">오늘 ${doneCount}/${habits.length}개 완료<br>"기록하지 않으면 존재하지 않는다"</div>
   </div>
-
   <form id="reflect-form">
     ${[
-      {id:'q1', icon:'🌊', label:'오늘 The One에 가까워진 행동 1가지?', hint:'작은 것도 좋다. 수영 완료, 공부 2시간, 물 2L...'},
-      {id:'q2', icon:'🔥', label:'재극인(土/火) 행동을 했나?', hint:'충동 구매, 감정적 결정, 과식, 무의미한 SNS...'},
+      {id:'q1', icon:'🌊', label:'오늘 The One임을 확인한 행동 1가지?', hint:'수영 완료, 공부 2시간, 물 2L...'},
+      {id:'q2', icon:'🔥', label:'재극인(土/火) 행동을 했나?', hint:'충동 구매, 감정적 결정, 무의미한 SNS...'},
       {id:'q3', icon:'⭐', label:'내일 #1 행동?', hint:'구체적으로. "CFA 2시간" ○ / "열심히" ✗'}
     ].map(q=>`
     <div class="reflect-q">
@@ -289,7 +257,6 @@ function renderReflect() {
     </div>`).join('')}
     <button type="submit" class="btn btn-water btn-full">💾 저장 · 내일을 설계하다</button>
   </form>
-
   <div class="divider"></div>
   <div class="section-head">🙏 불교 수행 · 오늘의 수련</div>
   ${[
@@ -314,13 +281,17 @@ function renderEvolve() {
     <div class="es-num">${report?.score?.total || 0}</div>
     <div class="es-label">진화 점수 / 100</div>
   </div>
-
   <div class="the-one-bar">
     <div class="tob-label">The One까지</div>
     <div class="tob-value">${formatAsset(profile.targetAsset - profile.asset)}</div>
-    <div class="tob-sub">현재 ${formatAsset(profile.asset)} · 목표 5경원</div>
+    <div class="tob-sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      현재 <b style="color:var(--water)">${formatAsset(profile.asset)}</b> · 목표 5경원
+      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.manualAsset()">✏️ 직접 입력</button>
+    </div>
     <div class="progress-track"><div class="progress-fill" style="width:${(profile.asset/profile.targetAsset*100).toFixed(5)}%"></div></div>
   </div>
+
+  <div id="pf-container"><div class="card" style="color:var(--text2);text-align:center">📊 포트폴리오 로딩 중...</div></div>
 
   ${evo?.insights?.length ? `
   <div class="section-head">⚡ 이번 주 인사이트</div>
@@ -347,10 +318,8 @@ function renderEvolve() {
       <div class="dw-desc" style="color:${d.color}">${d.desc}</div>
     </div>`).join('')}
   </div>
-
   <div class="divider"></div>
   <div class="section-head">⚙ 설정</div>
-  <button class="btn btn-water btn-full" onclick="window.openSettings()">자산 업데이트 · Firebase 설정</button>
   <button class="btn btn-gold btn-full mt8" onclick="window.forceEvolve()">🔄 자가진화 지금 실행</button>`;
 }
 
@@ -366,7 +335,6 @@ function renderMandaratGrid() {
 
 // ─── BIND EVENTS ───
 function bindEvents() {
-  // Gate
   document.getElementById('gate-submit')?.addEventListener('click', submitGate);
   document.querySelectorAll('.energy-opt').forEach(btn => {
     btn.onclick = () => {
@@ -374,8 +342,6 @@ function bindEvents() {
       btn.classList.add('selected');
     };
   });
-
-  // Habits
   document.querySelectorAll('.habit-row[data-hid]').forEach(row => {
     row.onclick = () => {
       const id = row.dataset.hid;
@@ -385,16 +351,13 @@ function bindEvents() {
       render();
     };
   });
-
   document.getElementById('btn-full-mode')?.addEventListener('click', () => { isTinyMode = false; render(); });
   document.getElementById('btn-tiny-mode')?.addEventListener('click', () => { isTinyMode = true; render(); });
-
-  // Reflect
   document.getElementById('reflect-form')?.addEventListener('submit', e => {
     e.preventDefault();
     const data = { q1: document.getElementById('rq_q1').value, q2: document.getElementById('rq_q2').value, q3: document.getElementById('rq_q3').value };
     Store.setJournal(data);
-    alert('✅ 저장됐습니다. 내일을 설계했습니다.');
+    alert('✅ 저장됐습니다.');
   });
 }
 
@@ -409,18 +372,43 @@ function submitGate() {
   render();
 }
 
+// ─── PORTFOLIO ───
+async function loadPortfolioUI(force=false) {
+  const el = document.getElementById('pf-container');
+  if (!el) return;
+  if (_pfData && !force) {
+    el.innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRate, false);
+    return;
+  }
+  el.innerHTML = renderPortfolioSection([], 0, 1380, true);
+  try {
+    _pfData = await calcPortfolioTotal();
+    if (_pfData.total > 0) {
+      const p = Store.getProfile(); p.asset = _pfData.total; Store.setProfile(p);
+    }
+    if (document.getElementById('pf-container')) {
+      document.getElementById('pf-container').innerHTML = renderPortfolioSection(_pfData.details, _pfData.total, _pfData.fxRate, false);
+    }
+  } catch(e) {
+    if (document.getElementById('pf-container'))
+      document.getElementById('pf-container').innerHTML = '<div class="card" style="color:var(--text2)">포트폴리오 로드 실패</div>';
+  }
+}
+
 // ─── GLOBALS ───
 window.switchToCore = () => switchTab('core');
+window.manualAsset = () => {
+  const asset = prompt('현재 자산 직접 입력 (원)', Store.getProfile().asset);
+  if (asset) { const p = Store.getProfile(); p.asset = parseInt(asset); Store.setProfile(p); render(); }
+};
 window.reqNotif = async () => {
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    // FCM 토큰 등록 (앱 꺼져도 알림 수신)
     try {
       const { FB } = await import('./firebase-init.js');
       const token = await FB.registerFCM();
       if (token) console.log('[FCM] Push registered ✅');
     } catch(e) { console.warn('FCM register failed:', e); }
-    // 로컬 스케줄 알림도 설정 (백업)
     scheduleNotifications();
   }
   render();
@@ -435,26 +423,59 @@ window.forceEvolve = async () => {
   render();
   alert('✅ 자가진화 완료');
 };
-window.openSettings = () => {
-  const asset = prompt('현재 자산 (원)', Store.getProfile().asset);
-  if (asset) { const p = Store.getProfile(); p.asset = parseInt(asset); Store.setProfile(p); render(); }
+window.openPortfolioEditor = () => {
+  const modal = document.createElement('div');
+  modal.id = 'pf-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;overflow-y:auto;padding-bottom:40px';
+  modal.innerHTML = renderPortfolioEditor();
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ 닫기';
+  closeBtn.className = 'btn btn-ghost btn-full';
+  closeBtn.style.margin = '0 16px 24px';
+  closeBtn.onclick = () => modal.remove();
+  modal.appendChild(closeBtn);
+  document.body.appendChild(modal);
 };
+window.pfAddRow = () => {
+  const h = Portfolio.getHoldings();
+  h.push({ id: Date.now(), ticker:'', name:'', quantity:0, currency:'USD' });
+  Portfolio.setHoldings(h);
+  const m = document.getElementById('pf-modal');
+  if (m) m.innerHTML = renderPortfolioEditor();
+};
+window.pfRemove = (i) => {
+  const h = Portfolio.getHoldings(); h.splice(i,1); Portfolio.setHoldings(h);
+  const m = document.getElementById('pf-modal');
+  if (m) m.innerHTML = renderPortfolioEditor();
+};
+window.pfUpdateField = (i, field, val) => {
+  const h = Portfolio.getHoldings();
+  h[i][field] = field === 'quantity' ? parseFloat(val)||0 : val;
+  Portfolio.setHoldings(h);
+};
+window.pfSave = async () => {
+  const cash = parseFloat(document.getElementById('pf-cash')?.value)||0;
+  Portfolio.setCash(cash);
+  document.getElementById('pf-modal')?.remove();
+  _pfData = null;
+  await loadPortfolioUI(true);
+};
+window.saveFmpKey = () => {
+  const k = document.getElementById('pf-fmp-key')?.value.trim();
+  if (k) { localStorage.setItem('fmp_api_key', k); render(); }
+};
+window.refreshPortfolio = () => { _pfData = null; loadPortfolioUI(true); };
 
 // ─── NOTIFICATIONS ───
-async function requestNotificationPermission() {
-  if (Notification.permission === 'default') {
-    // Don't auto-request — let user tap the prompt
-  }
-}
+async function requestNotificationPermission() { /* user triggers manually */ }
 
 function scheduleNotifications() {
-  // Schedule via Service Worker (basic)
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SCHEDULE_NOTIF',
       notifications: [
         { hour: 6, min: 30, title: '☯ The One의 아침', body: '아침 게이트를 통과하라. 지금 시작하라.' },
-        { hour: 22, min: 0, title: '🌙 저녁 성찰', body: '오늘 The One에 가까워졌나? 기록하라.' }
+        { hour: 22, min: 0, title: '🌙 저녁 성찰', body: 'The One은 오늘을 기록한다.' }
       ]
     });
   }

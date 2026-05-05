@@ -202,3 +202,19 @@ button{cursor:pointer;font-family:inherit}
 /* LOADING */
 .loading{display:flex;align-items:center;justify-content:center;height:60px;color:var(--text3);font-size:13px;gap:8px}
 .spin{animation:spin 1s linear infinite;display:inline-block}
+
+/* 式式式 PORTFOLIO 式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式式 */
+.pf-header { padding: 12px 0 8px; }
+.pf-total { font-size: 28px; font-weight: 800; color: var(--water); }
+.pf-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.pf-list { margin-top: 8px; }
+.pf-row { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 13px; }
+.pf-ticker { font-weight: 700; color: var(--water); min-width: 60px; }
+.pf-name { flex: 1; color: var(--text2); font-size: 11px; }
+.pf-qty { color: var(--text2); font-size: 11px; min-width: 50px; text-align: right; }
+.pf-val { min-width: 80px; text-align: right; font-weight: 600; }
+.pf-err { color: var(--text3); }
+.pf-up { color: var(--success); font-size: 10px; margin-left: 3px; }
+.pf-dn { color: var(--fire); font-size: 10px; margin-left: 3px; }
+.pf-loading { text-align: center; padding: 20px; color: var(--text2); font-size: 13px; }
+.pf-edit-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

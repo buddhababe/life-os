@@ -1,4 +1,4 @@
-// MAIN ENTRY — Life OS v2.0 (Top-Down Architecture)
+// MAIN ENTRY — Life OS v2.0 (Top-Down V4)
 import { getDayGanjio, getDayRating, getYongshinActivities, DAEWOON } from './saju.js';
 import { Store } from './store.js';
 import { engine } from './evolution.js';
@@ -6,7 +6,7 @@ import { Portfolio, calcPortfolioTotal, renderPortfolioSection, renderPortfolioE
 
 const today = new Date();
 const todayKey = today.toISOString().slice(0,10);
-let currentTab = 'today';
+let currentTab = 'radar';
 let isTinyMode = false;
 let _pfData = null;
 
@@ -14,6 +14,11 @@ let _pfData = null;
 let flowSeconds = 0;
 let flowInterval = null;
 let isFlowing = false;
+let flowChallenge = 5;
+let flowSkill = 5;
+
+// Zoom Mandarat state
+let mandaratZoomedId = -1; // -1 = center 3x3 view
 
 // ─── BOOT ───
 window.addEventListener('load', async () => {
@@ -55,9 +60,8 @@ async function showApp() {
   const evoResult = await engine.autoCheck();
   window._evo = evoResult;
   
-  // Decide starting tab based on Gate
   const gate = Store.getGate(todayKey);
-  currentTab = 'today';
+  currentTab = gate.done ? 'today' : 'radar';
   switchTab(currentTab);
   setInterval(updateHeader, 60000);
 }
@@ -99,6 +103,7 @@ function render() {
   const div = document.createElement('div');
   div.className = 'page-enter';
   switch(currentTab) {
+    case 'radar':    div.innerHTML = renderRadar(); break;
     case 'vision':   div.innerHTML = renderVision(); break;
     case 'strategy': div.innerHTML = renderStrategy(); break;
     case 'today':    div.innerHTML = renderToday(); break;
@@ -109,6 +114,54 @@ function render() {
   if (currentTab === 'evolve') loadPortfolioUI();
 }
 
+// ─── 0. RADAR & BUSINESS (레이더) ───
+function renderRadar() {
+  const r = Store.getRadar();
+  const s = Store.getSandbox();
+  const f = Store.getForge();
+
+  return `
+  <div class="identity-bar" style="margin-bottom:16px">
+    <div class="ib-vote">세상 감지 (World Radar)</div>
+    <div class="ib-text">거시적 변화를 모니터링하여 생존 우위를 점하라.</div>
+  </div>
+
+  <div class="section-head mt16">📡 AI 및 시장 모니터링</div>
+  ${r.map(item => `
+    <div class="radar-item">
+      <div class="radar-header"><span>${item.date}</span></div>
+      <div style="font-weight:700;color:var(--water);font-size:13px;margin-bottom:4px">${item.title}</div>
+      <div style="font-size:11px;color:var(--text2)">${item.desc}</div>
+    </div>
+  `).join('')}
+
+  <div class="divider"></div>
+  <div class="section-head">💡 아이디어 샌드박스 (비즈니스 필터)</div>
+  ${s.map(item => `
+    <div class="radar-item" style="border-color: ${item.status==='보류'?'rgba(255,255,255,0.05)':'var(--gold)'}">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${item.title} <span style="font-size:10px;padding:2px 6px;background:rgba(255,255,255,0.1);border-radius:4px">${item.status}</span></div>
+      <div style="font-size:11px;color:var(--text2);display:flex;justify-content:space-between">
+        <span>AI 대체율: <b style="color:var(--fire)">${item.AI_replace}</b></span>
+        <span>사주 상성: <b style="color:var(--water)">${item.Saju}</b></span>
+      </div>
+    </div>
+  `).join('')}
+
+  <div class="divider"></div>
+  <div class="section-head">🔨 무기 제련소 (Skill Forge)</div>
+  ${f.map(item => `
+    <div class="radar-item">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-weight:700;font-size:12px">${item.skill}</span>
+        <span style="font-size:10px;color:var(--text2)">${item.level}</span>
+      </div>
+      <div class="progress-track" style="height:4px;margin:0"><div class="progress-fill" style="width:${item.exp}%"></div></div>
+    </div>
+  `).join('')}
+  <button class="btn btn-ghost btn-full mt16" onclick="alert('편집 기능 준비중')">✏️ 레이더/사업 항목 편집</button>
+  `;
+}
+
 // ─── 1. VISION (비전) ───
 function renderVision() {
   const i = Store.getIkigai();
@@ -117,25 +170,24 @@ function renderVision() {
     <div class="ib-vote">트랜서핑 목표 슬라이드 (The Slide)</div>
     <div class="ib-text" style="font-size:16px">"나는 이미<br><span style="color:var(--gold)">${i.ikigai}</span>이다."</div>
   </div>
+  
   <div class="section-head">🌸 이키가이 (Ikigai)</div>
-  <div class="card">
-    <div style="font-size:11px;color:var(--text2)">❤️ 좋아하는 것 (Love)</div>
-    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.love}</div>
-    <div style="font-size:11px;color:var(--text2)">💪 잘하는 것 (Good At)</div>
-    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.goodAt}</div>
-    <div style="font-size:11px;color:var(--text2)">🌍 세상이 필요로 하는 것 (World Needs)</div>
-    <div style="font-weight:700;margin-bottom:12px;font-size:14px">${i.worldNeeds}</div>
-    <div style="font-size:11px;color:var(--text2)">💰 돈이 되는 것 (Paid For)</div>
-    <div style="font-weight:700;font-size:14px">${i.paidFor}</div>
+  <div class="ikigai-svg-wrap">
+    <div class="ikigai-circle ikigai-top" onclick="alert('❤️ 좋아하는 것: ${i.love}')">LOVE</div>
+    <div class="ikigai-circle ikigai-left" onclick="alert('💪 잘하는 것: ${i.goodAt}')">GOOD AT</div>
+    <div class="ikigai-circle ikigai-right" onclick="alert('🌍 세상이 필요한 것: ${i.worldNeeds}')">WORLD<br>NEEDS</div>
+    <div class="ikigai-circle ikigai-bottom" onclick="alert('💰 돈이 되는 것: ${i.paidFor}')">PAID FOR</div>
+    <div class="ikigai-center" style="cursor:pointer" onclick="window.editIkigai()">IKIGAI</div>
   </div>
-  <div class="saju-band sb-a" style="margin-top:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1)">
+  <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:16px">각 영역을 탭하여 상세 내용을 확인하세요. 중앙 탭시 수정.</div>
+
+  <div class="saju-band sb-a" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1)">
     <div class="sb-icon">🕊️</div>
     <div class="sb-text">
       <div class="sb-label">중요도 낮추기 (Dropping Importance)</div>
       목표에 대한 과도한 집착을 버려라. 세상은 거울이다. 이미 이룬 자처럼 가볍게 선택하라.
     </div>
   </div>
-  <button class="btn btn-water btn-full mt16" onclick="window.editIkigai()">✏️ 이키가이 수정</button>
   `;
 }
 
@@ -143,9 +195,18 @@ function renderVision() {
 function renderStrategy() {
   const w = Store.getWoop();
   return `
-  <div class="section-head">🎯 만다라트 (The Blueprint)</div>
-  <div class="mandarat-wrap"><div class="mandarat-grid" id="mg">${renderMandaratGrid()}</div></div>
-  <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:8px">칸을 탭하여 세부 목표를 수정하세요.</div>
+  <div class="section-head" style="display:flex;justify-content:space-between">
+    <span>🎯 만다라트 (The Blueprint)</span>
+    ${mandaratZoomedId !== -1 ? `<button class="btn" style="font-size:10px;padding:2px 8px" onclick="window.zoomOutMandarat()">🔙 뒤로가기</button>` : ''}
+  </div>
+  <div class="mandarat-zoom-wrap">
+    <div class="mandarat-grid ${mandaratZoomedId !== -1 ? 'zoomed' : ''}" id="mg">
+      ${renderMandaratCells()}
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:16px">
+    ${mandaratZoomedId === -1 ? '세부 목표 칸을 탭하여 줌인(Zoom-in) 하세요.' : '칸을 탭하여 내용을 수정하세요.'}
+  </div>
 
   <div class="divider"></div>
   <div class="section-head">🛡️ WOOP 심적 대비 (Mental Contrasting)</div>
@@ -161,6 +222,43 @@ function renderStrategy() {
   </div>
   <button class="btn btn-ghost btn-full mt8" onclick="window.editWoop()">✏️ WOOP 수정</button>
   `;
+}
+
+function renderMandaratCells() {
+  const { cells } = Store.getMandarat();
+  const MAINS = [13,22,31,39,41,49,58,67];
+  let html = '';
+  
+  if (mandaratZoomedId === -1) {
+    // Show only 9 main cells (index 40 and the 8 surrounding ones)
+    // To make it look like a 3x3 grid, we just generate 9 cells
+    const centers = [
+      [cells[13], 13], [cells[22], 22], [cells[31], 31],
+      [cells[39], 39], [cells[40]||'THE\nONE', 40], [cells[41], 41],
+      [cells[49], 49], [cells[58], 58], [cells[67], 67]
+    ];
+    html = centers.map(c => `
+      <div class="mc ${c[1]===40?'main-center':'sub-center'}" onclick="${c[1]===40 ? '' : `window.zoomInMandarat(${c[1]})`}">
+        ${c[0]||'+'}
+      </div>
+    `).join('');
+  } else {
+    // Zoomed in: show the 9 cells of the selected sub-grid
+    // Mapping main index to its 3x3 block
+    const getBlockIndices = (centerIdx) => {
+      const row = Math.floor(centerIdx/9); const col = centerIdx%9;
+      const res = [];
+      for(let r=row-1; r<=row+1; r++) for(let c=col-1; c<=col+1; c++) res.push(r*9+c);
+      return res;
+    };
+    const indices = getBlockIndices(mandaratZoomedId);
+    html = indices.map(idx => `
+      <div class="mc ${idx===mandaratZoomedId?'sub-center':''}" onclick="window.editCell(${idx})">
+        ${cells[idx]||'+'}
+      </div>
+    `).join('');
+  }
+  return html;
 }
 
 // ─── 3. TODAY (투데이) ───
@@ -203,30 +301,68 @@ function renderToday() {
     return html;
   }
 
-  // 3-2. FLOW & HABITS (낮)
-  const habits = Store.getHabits();
-  const comps = Store.getCompletions();
-  const rating = getDayRating(today);
-  const doneCount = habits.filter(h => comps[h.id]).length;
-  const allDone = doneCount === habits.length;
-  const autoTiny = rating.score <= -2;
+  // 3-2. FLOW MATRIX (낮)
   const formatTime = (sec) => {
     const m = Math.floor(sec/60).toString().padStart(2,'0');
     const s = (sec%60).toString().padStart(2,'0');
     return `${m}:${s}`;
   };
 
-  html += `
-  <div class="card" style="text-align:center;background:linear-gradient(180deg, rgba(64,196,255,0.05) 0%, rgba(0,0,0,0) 100%); border-top: 2px solid var(--water)">
-    <div style="font-size:12px;color:var(--water);font-weight:700;letter-spacing:1px;margin-bottom:8px">🔥 FLOW TIMER (미하이 칙센트미하이)</div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">오늘의 #1 행동: <b>${gate.priority}</b></div>
-    <div id="flow-display" style="font-size:42px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">${formatTime(flowSeconds)}</div>
-    <button class="btn ${isFlowing ? 'btn-fire' : 'btn-water'} mt16" onclick="window.toggleFlow()" style="width:120px;font-weight:700">
-      ${isFlowing ? '■ 정지' : '▶ 몰입 시작'}
-    </button>
-    <div style="font-size:10px;color:var(--text3);margin-top:12px">난이도와 실력의 밸런스를 맞추어 무아지경에 진입하라.</div>
-  </div>
+  // Calculate flow state
+  let flowState = 'Apathy';
+  let flowMsg = '과제를 변경하세요.';
+  if (flowChallenge > 6 && flowSkill > 6) { flowState = 'Flow'; flowMsg = '🔥 완벽한 몰입 궤도입니다.'; }
+  else if (flowChallenge > 6 && flowSkill <= 6) { flowState = 'Anxiety'; flowMsg = '난이도를 낮추거나 힌트를 찾으세요.'; }
+  else if (flowChallenge <= 6 && flowSkill > 6) { flowState = 'Boredom'; flowMsg = '시간 제한을 두어 난이도를 높이세요.'; }
 
+  const canStartFlow = flowState === 'Flow';
+
+  html += `
+  <div class="section-head">🔥 2D 몰입 (Flow) 매트릭스</div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">오늘의 #1 행동: <b>${gate.priority}</b></div>
+    
+    <!-- Matrix Graphic -->
+    <div class="flow-matrix-wrap">
+      <div class="flow-quad flow-q-anxiety">불안 (Anxiety)</div>
+      <div class="flow-quad flow-q-flow">몰입 (Flow)</div>
+      <div class="flow-quad flow-q-apathy">무관심</div>
+      <div class="flow-quad flow-q-boredom">지루함 (Boredom)</div>
+      <div class="flow-axis-x"></div>
+      <div class="flow-axis-y"></div>
+      <div class="flow-label" style="bottom:4px;right:4px">실력 (Skill) →</div>
+      <div class="flow-label" style="top:4px;left:4px;transform:rotate(-90deg);transform-origin:0 0;">난이도 (Challenge) →</div>
+      
+      <!-- Dot -->
+      <div class="flow-dot" style="left:${flowSkill*10}%; bottom:${flowChallenge*10}%;"></div>
+    </div>
+
+    <!-- Sliders -->
+    <div style="margin-top:16px;text-align:left">
+      <label style="font-size:11px;color:var(--text2)">과제 난이도: <span style="color:#fff">${flowChallenge}</span></label>
+      <input type="range" min="1" max="10" value="${flowChallenge}" class="mb-input" oninput="window.updateFlowGraph('C', this.value)" style="padding:0">
+      <label style="font-size:11px;color:var(--text2);margin-top:8px;display:block">내 현재 실력: <span style="color:#fff">${flowSkill}</span></label>
+      <input type="range" min="1" max="10" value="${flowSkill}" class="mb-input" oninput="window.updateFlowGraph('S', this.value)" style="padding:0">
+    </div>
+
+    <!-- State message -->
+    <div style="margin-top:12px;font-size:12px;color:${canStartFlow?'var(--water)':'var(--fire)'};font-weight:700">${flowState}: ${flowMsg}</div>
+    
+    <div id="flow-display" style="font-size:42px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;margin-top:12px">${formatTime(flowSeconds)}</div>
+    <button class="btn ${isFlowing ? 'btn-fire' : 'btn-water'} mt8" onclick="window.toggleFlow()" style="width:100%;font-weight:700" ${!canStartFlow && !isFlowing ? 'disabled' : ''}>
+      ${isFlowing ? '■ 딥워크 정지' : '▶ 딥워크 타이머 시작'}
+    </button>
+  </div>
+  `;
+
+  // 3-3. HABITS (실행의도)
+  const habits = Store.getHabits();
+  const comps = Store.getCompletions();
+  const rating = getDayRating(today);
+  const doneCount = habits.filter(h => comps[h.id]).length;
+  const autoTiny = rating.score <= -2;
+
+  html += `
   <div class="section-head mt16" style="display:flex;justify-content:space-between;align-items:center">
     <div>⚡ 실행 의도 (If-Then Habits)</div>
     <div style="font-size:11px;font-weight:400;color:var(--text2)">${doneCount}/${habits.length} 완료</div>
@@ -256,7 +392,7 @@ function renderToday() {
   }).join('')}
   `;
 
-  // 3-3. REFLECT (저녁)
+  // 3-4. REFLECT (저녁)
   const saved = Store.getJournal(todayKey);
   const showReflect = hour >= 20 || saved.q1;
   
@@ -348,18 +484,8 @@ function renderEvolve() {
   
   <div class="divider"></div>
   <button class="btn btn-gold btn-full mt8" onclick="window.forceEvolve()">🔄 자가진화 수동 실행</button>
-  <div style="text-align:center;margin-top:20px;font-size:10px;color:var(--text3)">Life OS v2.0 - Ikigai & Flow Architecture</div>
+  <div style="text-align:center;margin-top:20px;font-size:10px;color:var(--text3)">Life OS v2.0 - V4 Architecture</div>
   `;
-}
-
-// ─── MANDARAT ───
-function renderMandaratGrid() {
-  const { cells } = Store.getMandarat();
-  const MAINS = [13,22,31,39,41,49,58,67];
-  return cells.map((c,i)=>`
-  <div class="mc ${i===40?'main-center':MAINS.includes(i)?'sub-center':''}" data-idx="${i}" onclick="editCell(${i})">
-    ${c||(i===40?'THE\nONE':'+')}
-  </div>`).join('');
 }
 
 // ─── BIND EVENTS ───
@@ -443,6 +569,19 @@ window.editWoop = () => {
   const plan = prompt('PLAN (If-Then 계획)', w.plan) || w.plan;
   Store.setWoop({ wish, outcome, obstacle, plan });
   render();
+};
+window.zoomInMandarat = (idx) => {
+  mandaratZoomedId = idx;
+  render();
+};
+window.zoomOutMandarat = () => {
+  mandaratZoomedId = -1;
+  render();
+};
+window.updateFlowGraph = (type, val) => {
+  if (type==='C') flowChallenge = parseInt(val);
+  if (type==='S') flowSkill = parseInt(val);
+  render(); // Re-render to show dot moving
 };
 window.toggleFlow = () => {
   isFlowing = !isFlowing;

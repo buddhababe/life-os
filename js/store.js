@@ -66,6 +66,14 @@ export const Store = {
   getWoop: () => get('woop', defaultWoop()),
   setWoop: (w) => { set('woop', w); sync('meta','woop',w); },
 
+  // Business / Radar
+  getRadar: () => get('radar', defaultRadar()),
+  setRadar: (r) => { set('radar', r); sync('meta','radar',r); },
+  getSandbox: () => get('sandbox', defaultSandbox()),
+  setSandbox: (s) => { set('sandbox', s); sync('meta','sandbox',s); },
+  getForge: () => get('forge', defaultForge()),
+  setForge: (f) => { set('forge', f); sync('meta','forge',f); },
+
   // Stats
   getStreak(habitId) {
     let s = 0;
@@ -93,7 +101,7 @@ export const Store = {
   async syncAll() {
     if (!FB.isReady()||!FB.getUser()) return;
     // Pull from Firestore if newer
-    for (const k of ['habits','goals','mandarat','profile','ikigai','woop']) {
+    for (const k of ['habits','goals','mandarat','profile','ikigai','woop','radar','sandbox','forge']) {
       const r = await FB.load('meta', k).catch(()=>null);
       if (r) set(k, r);
     }
@@ -143,4 +151,26 @@ function defaultWoop() {
     obstacle: '기신운(화/토)에 의한 조급함, 충동적 감정, 게으름',
     plan: '불안/충동이 올라오면 즉시 10분 명상(수)을 하고, 환경을 통제한다.'
   };
+}
+
+function defaultRadar() {
+  return [
+    { id: 1, title: 'AI 에이전트 본격화', desc: '단순 대화형에서 자율 수행 에이전트로 진화 중. 규제/신뢰성 보장 서비스가 유망.', date: '2026-05' },
+    { id: 2, title: '금융권 AI 규제 강화', desc: '환각 방지 및 컴플라이언스 체크 수요 폭증 예상.', date: '2026-05' }
+  ];
+}
+
+function defaultSandbox() {
+  return [
+    { id: 1, title: 'CFA/AICPA 연동 재무제표 AI 분석기', status: '검토중', AI_replace: '낮음(신뢰성 필수)', Saju: '수/금(퍼펙트)' },
+    { id: 2, title: 'Legal-AI 판례 분석 에이전트', status: '보류', AI_replace: '보통', Saju: '금' }
+  ];
+}
+
+function defaultForge() {
+  return [
+    { id: 1, skill: 'CFA Level 1', level: '준비중', exp: 0 },
+    { id: 2, skill: 'Python / 퀀트 코딩', level: '초급', exp: 40 },
+    { id: 3, skill: '컬럼비아대 복학 준비', level: '진행중', exp: 20 }
+  ];
 }

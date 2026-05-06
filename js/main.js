@@ -84,9 +84,15 @@ function updateHeader() {
 
 // ─── NAV ───
 function setupNav() {
-  document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.onclick = () => switchTab(btn.dataset.tab);
-  });
+  // Event delegation — a single listener on the nav container
+  // ensures taps on inner elements (icon/label divs) always work.
+  const nav = document.querySelector('.app-nav');
+  if (nav) {
+    nav.addEventListener('click', (e) => {
+      const btn = e.target.closest('.nav-item');
+      if (btn && btn.dataset.tab) switchTab(btn.dataset.tab);
+    });
+  }
 }
 
 function switchTab(tab) {

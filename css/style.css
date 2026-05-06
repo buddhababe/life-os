@@ -30,7 +30,7 @@ button{cursor:pointer;font-family:inherit}
 .identity-sub{font-size:14px;color:var(--text2);margin-top:4px;letter-spacing:3px}
 
 /* SCREENS */
-.screen{height:100vh;overflow:hidden}
+.screen{height:100vh;height:100dvh;overflow:hidden}
 .hidden{display:none!important}
 
 /* AUTH */
@@ -57,17 +57,18 @@ button{cursor:pointer;font-family:inherit}
 .streak-display{font-size:13px;font-weight:700;color:var(--gold);display:flex;align-items:center;gap:4px}
 
 /* PAGE */
-.page{flex:1;overflow-y:auto;padding:16px 16px calc(var(--nav-h)+16px)}
+.page{flex:1;overflow-y:auto;padding:16px 16px calc(var(--nav-h) + 20px)}
 .page::-webkit-scrollbar{width:2px}
 .page::-webkit-scrollbar-thumb{background:var(--water);opacity:.3}
 
 /* NAV */
-.app-nav{height:var(--nav-h);display:flex;background:rgba(6,6,18,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
-.nav-item{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text3);transition:all .2s}
+.app-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);display:flex;background:rgba(6,6,18,.97);backdrop-filter:blur(20px);border-top:1px solid var(--border);z-index:100;padding-bottom:env(safe-area-inset-bottom,0)}
+.nav-item{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text3);transition:all .2s;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:44px}
 .nav-item.active{color:var(--water)}
 .nav-item.active .ni-icon{filter:drop-shadow(0 0 6px var(--water))}
-.ni-icon{font-size:20px}
-.ni-label{font-size:9px;font-weight:700;letter-spacing:.5px}
+.ni-icon{font-size:20px;pointer-events:none}
+.nav-item:active{transform:scale(0.92);opacity:.8}
+.ni-label{font-size:9px;font-weight:700;letter-spacing:.5px;pointer-events:none}
 
 /* IDENTITY BAR */
 .identity-bar{background:linear-gradient(135deg,rgba(56,189,248,.06),rgba(251,191,36,.04));border:1px solid rgba(56,189,248,.15);border-radius:var(--r);padding:16px;margin-bottom:14px;text-align:center}
